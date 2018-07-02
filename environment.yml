@@ -1,0 +1,14 @@
+name: cs236605
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - pytorch
+  - jupyter
+  - numpy
+  - ipython
+  - pandas
+  - matplotlib
+  - pip:
+    - wfdb
+
