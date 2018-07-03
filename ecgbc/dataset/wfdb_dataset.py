@@ -21,7 +21,12 @@ class WFDBDataset(data.Dataset):
     def __getitem__(self, item):
         rec_name = self.rec_paths[item]
 
+        # Read raw data (signals) as ndarray and metadata (fields) as a dict
         signals, fields = wfdb.rdsamp(rec_name)
+
+        # Add record name to metadata
+        fields['rec_name'] = rec_name
+
         sample = {'signals': signals, 'fields': fields}
 
         if self.transform is not None:
