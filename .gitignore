@@ -106,6 +106,7 @@ fabric.properties
 modules.xml
 .idea/misc.xml
 .idea/other.xml
+.idea/vcs.xml
 *.ipr
 
 # Sonarlint plugin
