@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from tests import TEST_RESOURCES_PATH
-from cs236605_project.dataset.wfdb_dataset import WFDBDataset
+from ecgbc.dataset.wfdb_dataset import WFDBDataset
 
 
 class WFDBLoaderTest(unittest.TestCase):
