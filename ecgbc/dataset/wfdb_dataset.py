@@ -1,10 +1,9 @@
+from ecgbc.dataset import WFDB_HEADER_EXT
+
 import torch.utils.data as data
 import wfdb
 
 from pathlib import Path
-
-
-WFDB_HEADER_EXT = '.hea'
 
 
 class WFDBDataset(data.Dataset):
