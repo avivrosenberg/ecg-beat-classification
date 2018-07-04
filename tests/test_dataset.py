@@ -1,20 +1,24 @@
-import unittest
-import numpy as np
+import os
 import re
+import unittest
 
-from tests import TEST_RESOURCES_PATH
+import wfdb
 
 from ecgbc.dataset import ECG_CHANNEL_PATTERN
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
+from tests import TEST_RESOURCES_PATH
+
+WFDB_TEST_RESOURCES_PATH = f'{TEST_RESOURCES_PATH}/wfdb'
+WFDB_NUMBER_OF_TEST_RESOURCES = 2
 
 
-class WFDBDatasetTest(unittest.TestCase):
-
-    def setUp(self):
-        self.wfdb_dataset = WFDBDataset(f'{TEST_RESOURCES_PATH}/wfdb')
-
+class WFDBDatasetTestBase(object):
+    """
+    Abstract Base class for testing the WFDBDataset. The test classes should
+    inherit this.
+    """
     def test_len(self):
-        self.assertEqual(len(self.wfdb_dataset), 2)
+        self.assertEqual(len(self.wfdb_dataset), WFDB_NUMBER_OF_TEST_RESOURCES)
 
     def test_iterable(self):
         dataset_as_list = list(self.wfdb_dataset)
@@ -23,23 +27,65 @@ class WFDBDatasetTest(unittest.TestCase):
     def test_getitem(self):
         for i in range(0, len(self.wfdb_dataset)):
             sample = self.wfdb_dataset[i]
-            self.assertIsInstance(sample, dict)
-            self.assertIsInstance(sample['signals'], np.ndarray)
-            self.assertIsInstance(sample['fields'], dict)
+            self.assertIsInstance(sample, wfdb.Record)
 
     def test_data_shape(self):
         for sample in self.wfdb_dataset:
-            expected_shape = (
-                sample['fields']['sig_len'],
-                sample['fields']['n_sig'],
-            )
-            actual_shape = sample['signals'].shape
+            expected_shape = (sample.sig_len, sample.n_sig)
+            actual_shape = sample.p_signal.shape
 
             self.assertTupleEqual(expected_shape, actual_shape)
 
-    def test_metadata_has_record_name(self):
+    def test_metadata_has_record_path(self):
         for sample in self.wfdb_dataset:
-            self.assertTrue('rec_name' in sample['fields'])
+            self.assertTrue(hasattr(sample, 'record_path'))
+            self.assertEqual(os.path.dirname(sample.record_path),
+                             WFDB_TEST_RESOURCES_PATH)
+
+
+class WFDBDatasetDefaultChannelsTest(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH)
+
+    def test_only_first_channel_taken_by_default(self):
+        for sample in self.wfdb_dataset:
+            self.assertEqual(sample.n_sig, 1)
+
+
+class WFDBDatasetMultipleChannelsTest(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
+                                        first_channel_only=False)
+
+    def test_all_channels_taken(self):
+        for sample in self.wfdb_dataset:
+            self.assertEqual(sample.n_sig, 2)
+
+
+class WFDBDatasetCustomPattern1Test(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
+                                        channel_pattern='MLI+',
+                                        first_channel_only=False)
+
+    def test_only_matching_channels_taken(self):
+        for sample in self.wfdb_dataset:
+            self.assertEqual(sample.n_sig, 1)
+            self.assertEqual(sample.sig_name[0], 'MLII')
+
+
+class WFDBDatasetCustomPattern2Test(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
+                                        channel_pattern='MLI+|V\d',
+                                        first_channel_only=False)
+
+    def test_only_matching_channels_taken(self):
+        for sample in self.wfdb_dataset:
+            self.assertEqual(sample.n_sig, 2)
+            self.assertEqual(sample.sig_name[0], 'MLII')
+            self.assertTrue(sample.sig_name[1] == 'V1'or
+                            sample.sig_name[1] == 'V5')
 
 
 class ECGChannelRegexTest(unittest.TestCase):
