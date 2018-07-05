@@ -2,16 +2,18 @@ import numpy as np
 import scipy.signal as scipysignal
 
 
-class RemoveECGBaselineWithMedfilt(object):
+class SubtractMedianFilterWFDB(object):
     """
-    Transform that removes the baseline of an ECG signal using a median filter
-    based approach. Works with WFDB records.
+    Transform that removes the baseline of a signal by subtracting the
+    result of one or more median filters from the signal. Works with WFDB
+    records.
     """
 
     FILTER1_MS = 200
     FILTER2_MS = 600
 
     def __init__(self, filters=(FILTER1_MS, FILTER2_MS)):
+        assert len(filters) > 0
         self.filter_durations = filters
 
     def __call__(self, record):
