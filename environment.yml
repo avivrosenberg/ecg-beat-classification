@@ -3,12 +3,14 @@ channels:
   - pytorch
   - defaults
 dependencies:
-  - pytorch
-  - jupyter
   - numpy
-  - ipython
+  - scipy
   - pandas
   - matplotlib
+  - cython
+  - jupyter
+  - ipython
+  - pytorch
   - pip:
     - wfdb
 
