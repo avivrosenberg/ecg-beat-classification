@@ -56,3 +56,70 @@ class SubtractMedianFilterWFDB(object):
             result = scipysignal.medfilt(result, filter_in_samples)
 
         return result
+
+
+class LowPassFilterWFDB(object):
+    """
+    Transform that applies a lowpass filter to a signal.
+    Works with WFDB records.
+    """
+
+    DEFAULT_ORDER = 12
+    DEFAULT_CUTOFF_HZ = 35
+
+    def __init__(self,
+                 filter_order=DEFAULT_ORDER, cutoff_freq_hz=DEFAULT_CUTOFF_HZ,
+                 zero_phase=False):
+        """
+        Initializes the lowpass filter transform.
+        :param filter_order: Order of the FIR filter that will be created.
+        :param cutoff_freq_hz: Cutoff frequency in Hz.
+        :param zero_phase: Whether to use zero-phase filtering (i.e.
+        filtfilt(), which means the filter will be applied twice so slower).
+        Even if set to False, the filter delay will be removed and the end
+        of the signal will be padded with zeros.
+        """
+        self.filter_order = filter_order
+        self.cutoff_freq_hz = cutoff_freq_hz
+        self.zero_phase = zero_phase
+
+    def __call__(self, record):
+        """
+        Applies the transformation to the given record (each channel
+        individually).
+
+        :param record: A wfdb record to transform.
+        :type record: wfdb.Record
+        :return: The same WFDB record, with filtered data.
+        """
+        fs = record.fs
+        signal = record.p_signal
+        filtered_signal = self.filter_signal(signal, fs)
+        record.p_signal = filtered_signal
+
+        return record
+
+    def filter_signal(self, signal, fs):
+        # Calculate Nyquist frequency and cutoff frequency in normalized units
+        f_nyq = fs / 2
+        f_cutoff = self.cutoff_freq_hz / f_nyq
+
+        # Create the filter coefficients
+        fir_order = self.filter_order + 1
+        fir_b = scipysignal.firwin(fir_order, f_cutoff)
+        fir_a = [1]
+        axis = 0  # filter should operate along columns
+
+        # Apply filter
+        if not self.zero_phase:
+            filtered_signal = scipysignal.lfilter(fir_b, fir_a, signal,
+                                                  axis=axis)
+            # Remove the delay
+            fir_delay = int(fir_order / 2)
+            filtered_signal = np.roll(filtered_signal, -fir_delay)
+            filtered_signal[-fir_delay:0, :] = 0
+        else:
+            filtered_signal = scipysignal.filtfilt(fir_b, fir_a, signal,
+                                                   axis=axis)
+
+        return filtered_signal
