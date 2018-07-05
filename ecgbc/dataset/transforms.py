@@ -2,19 +2,11 @@ import numpy as np
 import scipy.signal as scipysignal
 
 
-class SubtractMedianFilterWFDB(object):
+class AbstractBaselineRemovalWFDB(object):
     """
-    Transform that removes the baseline of a signal by subtracting the
-    result of one or more median filters from the signal. Works with WFDB
-    records.
+    Base class for baseline-removal transforms that operate per-channel on
+    WFDB records.
     """
-
-    FILTER1_MS = 200
-    FILTER2_MS = 600
-
-    def __init__(self, filters=(FILTER1_MS, FILTER2_MS)):
-        assert len(filters) > 0
-        self.filter_durations = filters
 
     def __call__(self, record):
         """
@@ -43,6 +35,23 @@ class SubtractMedianFilterWFDB(object):
         return result
 
     def filter_channel(self, channel_data, fs):
+        raise NotImplementedError("This class is abstract")
+
+
+class SubtractMedianFilterWFDB(AbstractBaselineRemovalWFDB):
+    """
+    Transform that removes the baseline of a signal by subtracting the
+    result of one or more median filters from the signal. Works with WFDB
+    records.
+    """
+    FILTER1_MS = 200
+    FILTER2_MS = 600
+
+    def __init__(self, filters=(FILTER1_MS, FILTER2_MS)):
+        assert len(filters) > 0
+        self.filter_durations = filters
+
+    def filter_channel(self, channel_data, fs):
         result = channel_data
 
         for filter_duration_ms in self.filter_durations:
@@ -54,6 +63,29 @@ class SubtractMedianFilterWFDB(object):
 
             # Apply the current filter on the result of the previous filter
             result = scipysignal.medfilt(result, filter_in_samples)
+
+        return result
+
+
+class SubtractMovingAverageWFDB(AbstractBaselineRemovalWFDB):
+    """
+    Transform that removes the baseline of a signal by subtracting the
+    result of a moving average from the signal. Works with WFDB
+    records.
+    """
+
+    DEFAULT_DURATION_SEC = 1
+
+    def __init__(self, filter_duration_sec=DEFAULT_DURATION_SEC):
+        assert filter_duration_sec > 0
+        self.filter_duration_sec = filter_duration_sec
+
+    def filter_channel(self, channel_data, fs):
+        filter_length_samples = self.filter_duration_sec * fs
+        filter_kernel = np.ones((filter_length_samples,))
+        filter_kernel /= filter_length_samples
+
+        result = scipysignal.convolve(channel_data, filter_kernel, mode='same')
 
         return result
 
