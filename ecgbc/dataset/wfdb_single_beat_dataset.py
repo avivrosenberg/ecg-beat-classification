@@ -55,8 +55,8 @@ class WFDBSingleBeatDataset(Dataset):
         if not morph_ann:
             return None
 
-        beat_segments = self.generate_beat_segments(record, morph_ann)
-        return beat_segments
+        segments, labels = self.generate_beat_segments(record, morph_ann)
+        return segments, labels
 
     def __len__(self):
         return len(self.wfdb_dataset)
@@ -80,6 +80,7 @@ class WFDBSingleBeatDataset(Dataset):
 
         r_peaks = []
         beat_segments = np.empty((seg_length, num_segments))
+        beat_labels = np.empty((num_segments,), dtype=str)
 
         for i, m in enumerate(matches):
             ecg_beat_feature_samples = [
@@ -91,22 +92,25 @@ class WFDBSingleBeatDataset(Dataset):
             r_peaks.append(ann.sample[m.start('r')])
 
             beat_segments[:, i] = seg
+            beat_labels[i] = m.group('r')
 
         if self.calculate_rr_features:
             r_peak_times = np.array(r_peaks) / record.fs
 
             rri, rrt, filter_idx = self.rr_intervals(r_peak_times)
             beat_segments = beat_segments[:, filter_idx]
+            beat_labels = beat_labels[filter_idx]
 
             rr_features, filter_idx = self.rri_features(rri, rrt)
             beat_segments = beat_segments[:, filter_idx]
+            beat_labels = beat_labels[filter_idx]
 
             beat_segments = np.vstack((
                 beat_segments,
                 rr_features
             ))
 
-        return beat_segments
+        return beat_segments, beat_labels
 
     def rr_intervals(self, r_peak_times):
         rri = np.diff(r_peak_times)  # Prepend zero interval
