@@ -26,7 +26,7 @@ class WFDBSingleBeatDataset(Dataset):
                  resample_duration_s=DEFAULT_RESAMPLE_DURATION_S,
                  resample_num_samples=DEFAULT_RESAMPLE_NUM_SAMPLES,
                  calculate_rr_features=True, filter_rri=False,
-                 ecgpuwave_bin=ECGPUWAVE_BIN):
+                 ecgpuwave_bin=ECGPUWAVE_BIN, transform=None):
         """
         A dataset of single ECG beats extracted from WFDB records.
         :type wfdb_dataset: WFDBDataset
@@ -42,6 +42,7 @@ class WFDBSingleBeatDataset(Dataset):
         self.calculate_rr_features = calculate_rr_features
         self.filter_rri = filter_rri
         self.ecgpuwave_bin = ecgpuwave_bin
+        self.transform = transform
 
         # Compile once to reduce per-record overhead
         self.beat_annotations_pattern = re.compile(
@@ -51,11 +52,14 @@ class WFDBSingleBeatDataset(Dataset):
         record = self.wfdb_dataset[index]
 
         morph_ann = self.load_morphology_annotation(record)
-
         if not morph_ann:
-            return None
+            return None, None
 
         segments, labels = self.generate_beat_segments(record, morph_ann)
+
+        if self.transform is not None:
+            segments, labels = self.transform((segments, labels))
+
         return segments, labels
 
     def __len__(self):
