@@ -1,9 +1,6 @@
 import os
-import pathlib
 import unittest
 from pathlib import Path
-
-import wfdb
 
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
 from ecgbc.dataset.wfdb_single_beat_dataset import WFDBSingleBeatDataset

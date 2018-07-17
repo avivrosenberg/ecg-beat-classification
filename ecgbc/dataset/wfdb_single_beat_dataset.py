@@ -1,22 +1,19 @@
 import math
+import os.path
+import re
 
 import numpy as np
 import scipy.interpolate as interp
 import scipy.signal as signal
-import os.path
-import re
-import subprocess
-import warnings
-
 import wfdb
 from torch.utils.data import Dataset
 
 from ecgbc.dataset import BEAT_ANNOTATIONS_PATTERN
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
+from physionet_tools.ecgpuwave import ECGPuWave
 
 
 class WFDBSingleBeatDataset(Dataset):
-    ECGPUWAVE_BIN = 'bin/ecgpuwave-1.3.3/ecgpuwave'
     DEFAULT_RESAMPLE_DURATION_S = 0.8
     DEFAULT_RESAMPLE_NUM_SAMPLES = 50
     RR_MAX = 1.5
@@ -26,7 +23,7 @@ class WFDBSingleBeatDataset(Dataset):
                  resample_duration_s=DEFAULT_RESAMPLE_DURATION_S,
                  resample_num_samples=DEFAULT_RESAMPLE_NUM_SAMPLES,
                  calculate_rr_features=True, filter_rri=False,
-                 ecgpuwave_bin=ECGPUWAVE_BIN, transform=None):
+                 transform=None):
         """
         A dataset of single ECG beats extracted from WFDB records.
         :type wfdb_dataset: WFDBDataset
@@ -41,7 +38,6 @@ class WFDBSingleBeatDataset(Dataset):
         self.resample_num_samples = resample_num_samples
         self.calculate_rr_features = calculate_rr_features
         self.filter_rri = filter_rri
-        self.ecgpuwave_bin = ecgpuwave_bin
         self.transform = transform
 
         # Compile once to reduce per-record overhead
@@ -228,52 +224,9 @@ class WFDBSingleBeatDataset(Dataset):
         record_path = record.record_path
 
         if not os.path.isfile(f'{record_path}.{self.out_ann_ext}'):
-            if not self.generate_morphology_annotation(record):
+            # Use an external tool, ecgpuwave, to generate the annotations
+            ecgpuwave = ECGPuWave()
+            if not ecgpuwave(record_path, self.out_ann_ext, self.in_ann_ext):
                 return None
 
         return wfdb.rdann(record_path, self.out_ann_ext)
-
-    def generate_morphology_annotation(self, record):
-        """
-        Runs an annotator (ecgpuwave) to create morphology annotations.
-        :param record: The record to create annotations for.
-        """
-        ecgpuwave_args = [
-            self.ecgpuwave_bin,
-            '-r', record.record_path,
-            '-a', self.out_ann_ext,
-        ]
-
-        if self.in_ann_ext:
-            ecgpuwave_args += ['-i', self.in_ann_ext]
-
-        try:
-            ecgpuwave_result = subprocess.run(
-                ecgpuwave_args,
-                check=True, shell=False, universal_newlines=True, timeout=10,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-
-            # ecgpuwave can sometimes fail but still return 0, so need to
-            # also check the stderr output.
-            if ecgpuwave_result.stderr:
-                # Annoying case: sometimes ecgpuwave writes to stderr but it's
-                # not an error...
-                if not re.match(r'Rearranging annotations[\w\s.]+done!',
-                                ecgpuwave_result.stderr):
-                    raise subprocess.CalledProcessError(0, ecgpuwave_args)
-
-        except subprocess.CalledProcessError as process_err:
-            warnings.warn(f'Failed to run ecgpuwave on record '
-                          f'{record.record_path}:\n'
-                          f'stderr: {ecgpuwave_result.stderr}\n'
-                          f'stdout: {ecgpuwave_result.stdout}\n')
-            return False
-
-        except subprocess.TimeoutExpired as timeout_err:
-            warnings.warn(f'Timed-out runnning ecgpuwave on record '
-                          f'{record.record_path}: '
-                          f'{ecgpuwave_result.stdout}')
-            return False
-
-        return True
