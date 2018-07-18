@@ -6,14 +6,14 @@ import numpy as np
 import scipy.interpolate as interp
 import scipy.signal as signal
 import wfdb
-from torch.utils.data import Dataset
+import torch.utils.data
 
-from ecgbc.dataset import BEAT_ANNOTATIONS_PATTERN
-from ecgbc.dataset.wfdb_dataset import WFDBDataset
-from physionet_tools.ecgpuwave import ECGPuWave
+import ecgbc.dataset
+import ecgbc.dataset.wfdb_dataset
+import physionet_tools.ecgpuwave
 
 
-class WFDBSingleBeatDataset(Dataset):
+class WFDBSingleBeatDataset(torch.utils.data.Dataset):
     DEFAULT_RESAMPLE_DURATION_S = 0.8
     DEFAULT_RESAMPLE_NUM_SAMPLES = 50
     RR_MAX = 1.5
@@ -42,7 +42,7 @@ class WFDBSingleBeatDataset(Dataset):
 
         # Compile once to reduce per-record overhead
         self.beat_annotations_pattern = re.compile(
-            BEAT_ANNOTATIONS_PATTERN, re.VERBOSE)
+            ecgbc.dataset.BEAT_ANNOTATIONS_PATTERN, re.VERBOSE)
 
     def __getitem__(self, index):
         record = self.wfdb_dataset[index]
@@ -52,6 +52,10 @@ class WFDBSingleBeatDataset(Dataset):
             return None, None
 
         segments, labels = self.generate_beat_segments(record, morph_ann)
+
+        # Transpose because externally (specifically in pytorch) the convention
+        # is that the first dimension is the batch dimension.
+        segments = segments.transpose()
 
         if self.transform is not None:
             segments, labels = self.transform((segments, labels))
@@ -225,7 +229,7 @@ class WFDBSingleBeatDataset(Dataset):
 
         if not os.path.isfile(f'{record_path}.{self.out_ann_ext}'):
             # Use an external tool, ecgpuwave, to generate the annotations
-            ecgpuwave = ECGPuWave()
+            ecgpuwave = physionet_tools.ecgpuwave.ECGPuWave()
             if not ecgpuwave(record_path, self.out_ann_ext, self.in_ann_ext):
                 return None
 

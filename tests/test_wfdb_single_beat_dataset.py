@@ -16,6 +16,7 @@ class WFDBSingleBeatDatasetTest(unittest.TestCase):
         self.wfdb_dataset = WFDBDataset(
             WFDB_TEST_RESOURCES_PATH, first_channel_only=True
         )
+        assert len(self.wfdb_dataset) > 0
 
     @classmethod
     def tearDownClass(cls):
@@ -50,10 +51,13 @@ class WFDBSingleBeatDatasetTest(unittest.TestCase):
     def _test_feature_vector_length_helper(self,
                                            wfdb_single_beat_dataset,
                                            expected_feature_vector_length):
+
+        self.assertGreater(len(wfdb_single_beat_dataset), 0)
+
         # Act
         for segments, labels in wfdb_single_beat_dataset:
             # Assert
-            actual_feature_vector_length = segments.shape[0]
+            actual_feature_vector_length = segments.shape[1]
             self.assertEqual(expected_feature_vector_length,
                              actual_feature_vector_length)
 
@@ -64,7 +68,7 @@ class WFDBSingleBeatDatasetTest(unittest.TestCase):
         # Act
         for segments, labels in wfdb_single_beat_dataset:
             num_labels = len(labels)
-            num_segments = segments.shape[1]
+            num_segments = segments.shape[0]
 
             # Assert
             self.assertEqual(num_labels, num_segments)
