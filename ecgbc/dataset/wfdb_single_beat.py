@@ -114,6 +114,17 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
                 rr_features
             ))
 
+
+        ### DEBUG
+        # import matplotlib.pyplot as plt
+        # fig, axes = plt.subplots(nrows=8, ncols=3, sharex='col')
+        # axes = np.reshape(axes, (-1,))
+        # beat_idx = np.random.permutation(beat_segments.shape[1])[0:len(axes)]
+        # for i, ax in enumerate(axes):
+        #     ax.plot(beat_segments[:-4, beat_idx[i]])
+        # fig.show()
+        #
+
         return beat_segments, beat_labels
 
     def rr_intervals(self, r_peak_times):
@@ -182,6 +193,17 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
         rri = rri[filter_idx]
         rri_features = rri_features[:, filter_idx]
 
+        ### DEBUG
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots(nrows=1, ncols=1)
+        # ax.plot(rrt, rri)
+        # ax.plot(rrt, rri_features[2, :], 'o')
+        # ax.plot(rrt, rri_features[3, :], 'x')
+        # ax.plot(rrt, np.ones_like(rrt)*np.mean(rri), '+')
+        # ax.legend(['rri_rs', '10sec', '5min', 'peak_times'])
+        # fig.show()
+        #
+
         return rri_features, filter_idx
 
     def resample_segment(self, record, segment_idx):
@@ -234,3 +256,4 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
                 return None
 
         return wfdb.rdann(record_path, self.out_ann_ext)
+

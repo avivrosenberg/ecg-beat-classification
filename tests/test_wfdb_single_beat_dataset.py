@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
-from ecgbc.dataset.wfdb_single_beat_dataset import WFDBSingleBeatDataset
+from ecgbc.dataset.wfdb_single_beat import WFDBSingleBeatDataset
 from tests import TEST_RESOURCES_PATH
 
 WFDB_TEST_RESOURCES_PATH = f'{TEST_RESOURCES_PATH}/wfdb'
