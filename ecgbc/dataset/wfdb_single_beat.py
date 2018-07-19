@@ -5,15 +5,34 @@ import re
 import numpy as np
 import scipy.interpolate as interp
 import scipy.signal as signal
+import torchvision
+import tqdm
 import wfdb
-import torch.utils.data
 
 import ecgbc.dataset
 import ecgbc.dataset.wfdb_dataset
 import physionet_tools.ecgpuwave
 
 
-class WFDBSingleBeatDataset(torch.utils.data.Dataset):
+class Dataset(torchvision.datasets.DatasetFolder):
+    """
+    A dataset of WFDB single beats.
+    Use the Generator class in this module to write a dataset based on WFDB
+    records to some folder. Then, this class cal be used to load the samples
+    from that folder.
+    """
+    def __init__(self, root_folder):
+        super().__init__(root_folder, self.load_segment, ['.npy'])
+
+    def load_segment(self, path):
+        return np.load(path)
+
+
+class Generator(object):
+    """
+    Generates a WFDB single-beat database and writes it to a folder where
+    each file is a labeled sample.
+    """
     DEFAULT_RESAMPLE_DURATION_S = 0.8
     DEFAULT_RESAMPLE_NUM_SAMPLES = 50
     RR_MAX = 1.5
@@ -22,8 +41,7 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
     def __init__(self, wfdb_dataset, in_ann_ext='atr', out_ann_ext='ecgatr',
                  resample_duration_s=DEFAULT_RESAMPLE_DURATION_S,
                  resample_num_samples=DEFAULT_RESAMPLE_NUM_SAMPLES,
-                 calculate_rr_features=True, filter_rri=False,
-                 transform=None):
+                 calculate_rr_features=True, filter_rri=False):
         """
         A dataset of single ECG beats extracted from WFDB records.
         :type wfdb_dataset: WFDBDataset
@@ -38,13 +56,40 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
         self.resample_num_samples = resample_num_samples
         self.calculate_rr_features = calculate_rr_features
         self.filter_rri = filter_rri
-        self.transform = transform
 
         # Compile once to reduce per-record overhead
         self.beat_annotations_pattern = re.compile(
             ecgbc.dataset.BEAT_ANNOTATIONS_PATTERN, re.VERBOSE)
 
+    def write(self, output_folder):
+        """
+        Writes the segments generated from the underlying wfdb_dataset to a
+        given output folder.
+        :param output_folder: Where to write to.
+        """
+        progress_desc = f'Generating dataset in {output_folder}'
+        self_iter_with_progress_bar = tqdm.tqdm(self, desc=progress_desc)
+
+        for segments, labels, rec_name in self_iter_with_progress_bar:
+            for seg_idx, segment in enumerate(segments):
+                seg_label = labels[seg_idx]
+
+                seg_dir = f'{output_folder}/{seg_label}'
+                seg_path = f'{seg_dir}/{rec_name}_{seg_idx}'
+                os.makedirs(seg_dir, exist_ok=True)
+
+                np.save(seg_path, segment, allow_pickle=False)
+
     def __getitem__(self, index):
+        """
+        Returns a record from the wfdb_dataset after segmenting it to single
+        beats, with a label for each beat.
+        :param index: Index of file in the wfdb_dataset
+        :return: Tuple of:
+            - segments: NxM matrix (N segments, M features per segments).
+            - labels: vector of length N, containing the beat type per segment.
+            - rec_name: The name of the record the segments came from.
+        """
         record = self.wfdb_dataset[index]
 
         morph_ann = self.load_morphology_annotation(record)
@@ -57,10 +102,7 @@ class WFDBSingleBeatDataset(torch.utils.data.Dataset):
         # is that the first dimension is the batch dimension.
         segments = segments.transpose()
 
-        if self.transform is not None:
-            segments, labels = self.transform((segments, labels))
-
-        return segments, labels
+        return segments, labels, record.record_name
 
     def __len__(self):
         return len(self.wfdb_dataset)
