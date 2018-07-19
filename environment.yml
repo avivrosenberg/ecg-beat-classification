@@ -12,6 +12,7 @@ dependencies:
   - jupyter
   - ipython
   - pytorch
+  - tqdm
   - pip:
     - wfdb
 
