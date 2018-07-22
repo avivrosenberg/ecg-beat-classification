@@ -31,6 +31,7 @@ class WFDBDataset(data.Dataset):
         channels that match the pattern.
         """
 
+        self.root_path = root_path
         self.transform = transform
         self.channel_pattern = re.compile(channel_pattern, re.IGNORECASE)
         self.first_channel_only = first_channel_only

@@ -67,13 +67,15 @@ class Generator(object):
         given output folder.
         :param output_folder: Where to write to.
         """
-        progress_desc = f'Generating dataset in {output_folder}'
+        progress_desc = f'{self.wfdb_dataset.root_path}'
         self_iter_with_progress_bar = tqdm.tqdm(self, desc=progress_desc)
 
         for segments, labels, rec_name in self_iter_with_progress_bar:
+            progress_desc = f'{self.wfdb_dataset.root_path}/{rec_name}'
+            self_iter_with_progress_bar.set_description(progress_desc)
+
             for seg_idx, segment in enumerate(segments):
                 seg_label = labels[seg_idx]
-
                 seg_dir = f'{output_folder}/{seg_label}'
                 seg_path = f'{seg_dir}/{rec_name}_{seg_idx}'
                 os.makedirs(seg_dir, exist_ok=True)
@@ -106,6 +108,21 @@ class Generator(object):
 
     def __len__(self):
         return len(self.wfdb_dataset)
+
+    def __iter__(self):
+        class GeneratorIter:
+            def __init__(self, generator):
+                self.generator = generator
+                self.i = 0
+
+            def __next__(self):
+                if self.i == len(self.generator):
+                    raise StopIteration
+                next_res = self.generator[self.i]
+                self.i += 1
+                return next_res
+
+        return GeneratorIter(self)
 
     def generate_beat_segments(self, record, ann):
         # Construct a long string of annotation symbols, since we are
