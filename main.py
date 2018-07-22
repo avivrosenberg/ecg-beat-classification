@@ -34,6 +34,8 @@ def parse_cli():
                                     help='Subtract moving average')
     subparser_generate.add_argument('--ann-ext', '-a', type=str, default='atr',
                                     help='Input annotation extension')
+    subparser_generate.add_argument('--rec-pattern', type=str, default=None,
+                                    help='Pattern for matching record names')
 
     return parser.parse_args()
 
@@ -50,6 +52,7 @@ def generate_dataset(in_dir, out_dir, ann_ext, **kwargs):
 
     wfdb_dataset = ecgbc.dataset.wfdb_dataset.WFDBDataset(
         root_path=in_dir,
+        recname_pattern=kwargs['rec_pattern'],
         transform=torchvision.transforms.Compose(transforms))
 
     generator = ecgbc.dataset.wfdb_single_beat.Generator(
