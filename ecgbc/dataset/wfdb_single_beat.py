@@ -1,3 +1,4 @@
+import collections
 import math
 import os.path
 import re
@@ -10,8 +11,9 @@ import tqdm
 import wfdb
 
 import ecgbc.dataset
-import ecgbc.dataset.wfdb_dataset
 import physionet_tools.ecgpuwave
+
+from ecgbc.dataset.wfdb_dataset import WFDBDataset
 
 
 class Dataset(torchvision.datasets.DatasetFolder):
@@ -38,7 +40,8 @@ class Generator(object):
     RR_MAX = 1.5
     RR_MIN = 0.4
 
-    def __init__(self, wfdb_dataset, in_ann_ext='atr', out_ann_ext='ecgatr',
+    def __init__(self, wfdb_dataset, in_ann_ext='atr',
+                 out_ann_ext='ecgatr',
                  resample_duration_s=DEFAULT_RESAMPLE_DURATION_S,
                  resample_num_samples=DEFAULT_RESAMPLE_NUM_SAMPLES,
                  calculate_rr_features=True, filter_rri=False):
@@ -67,13 +70,13 @@ class Generator(object):
         given output folder.
         :param output_folder: Where to write to.
         """
-        progress_desc = f'{self.wfdb_dataset.root_path}'
-        self_iter_with_progress_bar = tqdm.tqdm(self, desc=progress_desc)
+        if not len(self):
+            return
+
+        paths = collections.deque(self.wfdb_dataset.rec_paths)
+        self_iter_with_progress_bar = tqdm.tqdm(self, desc=paths.popleft())
 
         for segments, labels, rec_name in self_iter_with_progress_bar:
-            progress_desc = f'{self.wfdb_dataset.root_path}/{rec_name}'
-            self_iter_with_progress_bar.set_description(progress_desc)
-
             for seg_idx, segment in enumerate(segments):
                 seg_label = labels[seg_idx]
                 seg_dir = f'{output_folder}/{seg_label}'
@@ -81,6 +84,9 @@ class Generator(object):
                 os.makedirs(seg_dir, exist_ok=True)
 
                 np.save(seg_path, segment, allow_pickle=False)
+
+            if len(paths):
+                self_iter_with_progress_bar.set_description(paths.popleft())
 
     def __getitem__(self, index):
         """
@@ -96,7 +102,8 @@ class Generator(object):
 
         morph_ann = self.load_morphology_annotation(record)
         if not morph_ann:
-            return None, None
+            raise RuntimeError(f"Can't load or generate morphology "
+                               f"annotations for record {record.record_name}")
 
         segments, labels = self.generate_beat_segments(record, morph_ann)
 
@@ -145,34 +152,34 @@ class Generator(object):
         beat_segments = np.empty((seg_length, num_segments))
         beat_labels = np.empty((num_segments,), dtype=str)
 
-        for i, m in enumerate(matches):
-            ecg_beat_feature_samples = [
-                ann.sample[m.start('p_start')],
-                ann.sample[m.start('t_end')],
-            ]
+        if num_segments > 1:
+            for i, m in enumerate(matches):
+                ecg_beat_feature_samples = [
+                    ann.sample[m.start('p_start')],
+                    ann.sample[m.start('t_end')],
+                ]
 
-            seg = self.resample_segment(record, ecg_beat_feature_samples)
-            r_peaks.append(ann.sample[m.start('r')])
+                seg = self.resample_segment(record, ecg_beat_feature_samples)
+                r_peaks.append(ann.sample[m.start('r')])
 
-            beat_segments[:, i] = seg
-            beat_labels[i] = m.group('r')
+                beat_segments[:, i] = seg
+                beat_labels[i] = m.group('r')
 
-        if self.calculate_rr_features:
-            r_peak_times = np.array(r_peaks) / record.fs
+            if self.calculate_rr_features:
+                r_peak_times = np.array(r_peaks) / record.fs
 
-            rri, rrt, filter_idx = self.rr_intervals(r_peak_times)
-            beat_segments = beat_segments[:, filter_idx]
-            beat_labels = beat_labels[filter_idx]
+                rri, rrt, filter_idx = self.rr_intervals(r_peak_times)
+                beat_segments = beat_segments[:, filter_idx]
+                beat_labels = beat_labels[filter_idx]
 
-            rr_features, filter_idx = self.rri_features(rri, rrt)
-            beat_segments = beat_segments[:, filter_idx]
-            beat_labels = beat_labels[filter_idx]
+                rr_features, filter_idx = self.rri_features(rri, rrt)
+                beat_segments = beat_segments[:, filter_idx]
+                beat_labels = beat_labels[filter_idx]
 
-            beat_segments = np.vstack((
-                beat_segments,
-                rr_features
-            ))
-
+                beat_segments = np.vstack((
+                    beat_segments,
+                    rr_features
+                ))
 
         ### DEBUG
         # import matplotlib.pyplot as plt
