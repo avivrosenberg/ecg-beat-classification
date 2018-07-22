@@ -12,6 +12,7 @@ from pathlib import Path
 class WFDBDataset(data.Dataset):
     def __init__(self, root_path,
                  transform=None,
+                 recname_pattern=None,
                  channel_pattern=ECG_CHANNEL_PATTERN,
                  first_channel_only=True):
         """
@@ -26,6 +27,9 @@ class WFDBDataset(data.Dataset):
 
         :param root_path: The path of the directory to search for records in.
         :param transform: A transformation to apply.
+        :param recname_pattern: A regex pattern to match against record names
+            (without path or extension). Only matching records will be
+            included in this dataset.
         :param channel_pattern: The pattern to identify channels to read.
         :param first_channel_only: Whether to read only the first or all
         channels that match the pattern.
@@ -39,9 +43,25 @@ class WFDBDataset(data.Dataset):
         # Generate record paths. A PhysioNet record has two or more files:
         # one header (.hea) file and one or more data (.dat) or annotation
         # files (.atr, .qrs, .ecg, ...)
-        self.rec_paths = Path(root_path).glob(f'**/*{WFDB_HEADER_EXT}')
-        self.rec_paths = list(str(rec).split(WFDB_HEADER_EXT)[0]
-                              for rec in self.rec_paths)
+        paths_glob = Path(root_path).glob(f'**/*{WFDB_HEADER_EXT}')
+
+        if recname_pattern:
+            recname_pattern = re.compile(recname_pattern)
+        else:
+            recname_pattern = re.compile(r'.*')  # match-all regex
+
+        self.rec_paths = []
+        for path in paths_glob:
+            # Path to header without file extension
+            rec_path = str(path).split(WFDB_HEADER_EXT)[0]
+
+            # Name of the header file without path or extension
+            rec_name = path.stem
+
+            # Check if the name (without the path to it) matches the given
+            # pattern
+            if recname_pattern.match(rec_name):
+                self.rec_paths.append(rec_path)
 
     def __getitem__(self, item):
         rec_path = self.rec_paths[item]

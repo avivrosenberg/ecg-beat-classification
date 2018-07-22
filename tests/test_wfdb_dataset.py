@@ -60,7 +60,7 @@ class WFDBDatasetMultipleChannelsTest(WFDBDatasetTestBase, unittest.TestCase):
             self.assertEqual(sample.n_sig, 2)
 
 
-class WFDBDatasetCustomPattern1Test(WFDBDatasetTestBase, unittest.TestCase):
+class WFDBDatasetCustomChannel1Test(WFDBDatasetTestBase, unittest.TestCase):
     def setUp(self):
         self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
                                         channel_pattern='MLI+',
@@ -72,7 +72,7 @@ class WFDBDatasetCustomPattern1Test(WFDBDatasetTestBase, unittest.TestCase):
             self.assertEqual(sample.sig_name[0], 'MLII')
 
 
-class WFDBDatasetCustomPattern2Test(WFDBDatasetTestBase, unittest.TestCase):
+class WFDBDatasetCustomChannel2Test(WFDBDatasetTestBase, unittest.TestCase):
     def setUp(self):
         self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
                                         channel_pattern='MLI+|V\d',
@@ -84,6 +84,29 @@ class WFDBDatasetCustomPattern2Test(WFDBDatasetTestBase, unittest.TestCase):
             self.assertEqual(sample.sig_name[0], 'MLII')
             self.assertTrue(sample.sig_name[1] == 'V1'or
                             sample.sig_name[1] == 'V5')
+
+
+class WFDBDatasetCustomRecordName1Test(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
+                                        recname_pattern=r'\d+1',
+                                        first_channel_only=False)
+
+    def test_len(self):
+        self.assertEqual(len(self.wfdb_dataset), 1)
+
+    def test_correct_record_was_taken(self):
+        self.assertEqual(self.wfdb_dataset[0].record_name, '101')
+
+
+class WFDBDatasetCustomRecordName2Test(WFDBDatasetTestBase, unittest.TestCase):
+    def setUp(self):
+        self.wfdb_dataset = WFDBDataset(WFDB_TEST_RESOURCES_PATH,
+                                        recname_pattern=r'foo\d+',
+                                        first_channel_only=False)
+
+    def test_len(self):
+        self.assertEqual(len(self.wfdb_dataset), 0)
 
 
 if __name__ == '__main__':
