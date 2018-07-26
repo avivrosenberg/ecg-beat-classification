@@ -152,29 +152,30 @@ class Generator(object):
         beat_segments = np.empty((seg_length, num_segments))
         beat_labels = np.empty((num_segments,), dtype=str)
 
-        if num_segments > 1:
-            for i, m in enumerate(matches):
-                ecg_beat_feature_samples = [
-                    ann.sample[m.start('p_start')],
-                    ann.sample[m.start('t_end')],
-                ]
+        if num_segments < 2:
+            return beat_segments, beat_labels
 
-                seg = self.resample_segment(record, ecg_beat_feature_samples)
-                r_peaks.append(ann.sample[m.start('r')])
+        for i, m in enumerate(matches):
+            ecg_beat_feature_samples = [
+                ann.sample[m.start('p_start')],
+                ann.sample[m.start('t_end')],
+            ]
 
-                beat_segments[:, i] = seg
-                beat_labels[i] = m.group('r')
+            seg = self.resample_segment(record, ecg_beat_feature_samples)
+            r_peaks.append(ann.sample[m.start('r')])
 
-            if self.calculate_rr_features:
-                r_peak_times = np.array(r_peaks) / record.fs
+            beat_segments[:, i] = seg
+            beat_labels[i] = m.group('r')
 
-                rri, rrt, filter_idx = self.rr_intervals(r_peak_times)
-                beat_segments = beat_segments[:, filter_idx]
-                beat_labels = beat_labels[filter_idx]
+        if self.calculate_rr_features:
+            r_peak_times = np.array(r_peaks) / record.fs
 
-                rr_features, filter_idx = self.rri_features(rri, rrt)
-                beat_segments = beat_segments[:, filter_idx]
-                beat_labels = beat_labels[filter_idx]
+            rri, rrt, filter_idx = self.rr_intervals(r_peak_times)
+            beat_segments = beat_segments[:, filter_idx]
+            beat_labels = beat_labels[filter_idx]
+
+            if len(rri) > 2:
+                rr_features = self.rri_features(rri, rrt)
 
                 beat_segments = np.vstack((
                     beat_segments,
@@ -211,6 +212,9 @@ class Generator(object):
         return rri, rrt, filter_idx
 
     def rri_features(self, rri, rrt):
+        if len(rri) < 2:
+            return np.empty((0,))
+
         rr_features_next = rri
         rr_features_prev = np.r_[0, rri[:-1]]
 
@@ -221,20 +225,15 @@ class Generator(object):
 
         # Resample the RR intervals with uniform rate so we can apply filters
         fs_resampled = 4  # Hz
-        rrt_rs = np.r_[0:rrt[-1]:1/fs_resampled]
+        rrt_rs = np.r_[rrt[0]:rrt[-1]:1/fs_resampled]
         rri_rs = interp.interp1d(rrt, rri)(rrt_rs)
 
         def sliding_window_mean(sig, m):
+            # Take half the filter length since we're using filtfilt
+            m = np.min((m, len(sig))) // 2
             filter_kernel = np.ones((m,))
             filter_kernel /= m
-            result = signal.convolve(sig, filter_kernel, mode='full')
-            # Define N as the signal length and M as the filter length.
-            # Taking the first N values from the 'full' convolution means were
-            # doing a moving average that looks at the past. Taking the last N
-            # would be like looking at the future. Taking the 'middle' would be
-            # like a centered moving average.
-            # result = result[m-1:]  # looking forward
-            result = result[0:len(rri_rs)]  # looking back
+            result = signal.filtfilt(filter_kernel, 1, sig, method='gust')
             return result
 
         sliding_win_durations_s = [10, 5 * 60]
@@ -252,13 +251,6 @@ class Generator(object):
                 rr_intervals_mean_at(rrt)
             ))
 
-        # Remove features up to time of the longest filter, because only then
-        # is the filter performing a valid calculation
-        filter_idx = rrt > np.max(sliding_win_durations_s)
-        rrt = rrt[filter_idx]
-        rri = rri[filter_idx]
-        rri_features = rri_features[:, filter_idx]
-
         ### DEBUG
         # import matplotlib.pyplot as plt
         # fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -270,7 +262,7 @@ class Generator(object):
         # fig.show()
         #
 
-        return rri_features, filter_idx
+        return rri_features
 
     def resample_segment(self, record, segment_idx):
         """

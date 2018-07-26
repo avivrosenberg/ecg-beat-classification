@@ -31,7 +31,7 @@ BEAT_ANNOTATIONS_PATTERN = r'''
         \(
     )
     (?P<r>
-        [NVSFQ]
+        [NVSFQLRBAaJrFejnE/f]
     )
     (?P<r_end>
         \)
