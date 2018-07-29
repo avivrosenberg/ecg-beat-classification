@@ -35,22 +35,39 @@ class Generator(object):
     Generates a WFDB single-beat database and writes it to a folder where
     each file is a labeled sample.
     """
-    DEFAULT_RESAMPLE_DURATION_S = 0.8
+    DEFAULT_RESAMPLE_DURATION_S = 0.65  # For humans should be 0.55 ~ 0.75
     DEFAULT_RESAMPLE_NUM_SAMPLES = 50
     RR_MAX = 1.5
     RR_MIN = 0.4
+
+    AAMI_TO_WFDB_CLASSES = {
+        'N': {'N', 'L', 'R', 'B'},
+        'S': {'a', 'J', 'A', 'S', 'j', 'e', 'n'},
+        'V': {'V', 'E'},
+        'F': {'F'},
+        'Q': {'/', 'f', 'Q'},
+    }
+
+    WFDB_TO_AAMI_CLASSES = {
+        wfdb: aami
+        for aami, wfdb_set in AAMI_TO_WFDB_CLASSES.items()
+        for wfdb in wfdb_set
+    }
 
     def __init__(self, wfdb_dataset, in_ann_ext='atr',
                  out_ann_ext='ecgatr',
                  resample_duration_s=DEFAULT_RESAMPLE_DURATION_S,
                  resample_num_samples=DEFAULT_RESAMPLE_NUM_SAMPLES,
-                 calculate_rr_features=True, filter_rri=False):
+                 calculate_rr_features=True, filter_rri=False,
+                 aami_compatible=False):
         """
         A dataset of single ECG beats extracted from WFDB records.
         :type wfdb_dataset: WFDBDataset
         :param wfdb_dataset: A dataset of WFDB records.
         :param in_ann_ext: File extension of annotator containing beat types.
         :param out_ann_ext: File extension of annotator containing morphology.
+        :param aami_compatible: Whether labels should be AAMI classes or
+            PhysioNet classes.
         """
         self.wfdb_dataset = wfdb_dataset
         self.in_ann_ext = in_ann_ext
@@ -59,10 +76,11 @@ class Generator(object):
         self.resample_num_samples = resample_num_samples
         self.calculate_rr_features = calculate_rr_features
         self.filter_rri = filter_rri
+        self.aami_compatible = aami_compatible
 
         # Compile once to reduce per-record overhead
         self.beat_annotations_pattern = re.compile(
-            ecgbc.dataset.BEAT_ANNOTATIONS_PATTERN, re.VERBOSE)
+            ecgbc.dataset.BEAT_ANNOTATIONS_PATTERN_PEAKS_ONLY, re.VERBOSE)
 
     def write(self, output_folder):
         """
@@ -156,16 +174,18 @@ class Generator(object):
             return beat_segments, beat_labels
 
         for i, m in enumerate(matches):
-            ecg_beat_feature_samples = [
-                ann.sample[m.start('p_start')],
-                ann.sample[m.start('t_end')],
-            ]
+            # Extract ECG beat segment
+            seg = self.resample_segment(record,
+                                        r_peak_idx=ann.sample[m.start('r')])
+            beat_segments[:, i] = seg
 
-            seg = self.resample_segment(record, ecg_beat_feature_samples)
+            # Save R-peak location
             r_peaks.append(ann.sample[m.start('r')])
 
-            beat_segments[:, i] = seg
+            # Save beat label
             beat_labels[i] = m.group('r')
+            if self.aami_compatible:
+                beat_labels[i] = self.WFDB_TO_AAMI_CLASSES[beat_labels[i]]
 
         if self.calculate_rr_features:
             r_peak_times = np.array(r_peaks) / record.fs
@@ -233,7 +253,7 @@ class Generator(object):
             m = np.min((m, len(sig))) // 2
             filter_kernel = np.ones((m,))
             filter_kernel /= m
-            result = signal.filtfilt(filter_kernel, 1, sig, method='gust')
+            result = signal.filtfilt(filter_kernel, 1, sig, method='pad')
             return result
 
         sliding_win_durations_s = [10, 5 * 60]
@@ -264,42 +284,41 @@ class Generator(object):
 
         return rri_features
 
-    def resample_segment(self, record, segment_idx):
+    def resample_segment(self, record, p_start_idx=None, r_peak_idx=None):
         """
         Resamples a given segment from the record.
+        :param p_start_idx: Sample index of p-wave onset.
+        :param r_peak_idx: Sample index of r-peak. One of the two indices
+            must be provided.
         :param record: wfdb record.
-        :param segment_idx: An array of at least two sample indices. The first
-        is the first sample of the segment and the last is the last sample
-        of the segment.
         :return: The values of the resampled segment
         """
-        seg_start = segment_idx[0]
-        seg_end = segment_idx[-1]
 
-        duration_s = (seg_end - seg_start) / record.fs
+        # Calculate length of segment in samples
+        delta_samples = math.floor(self.resample_duration_s * record.fs)
 
-        delta_samples = math.floor(
-            math.fabs(self.resample_duration_s - duration_s) * record.fs / 2
-        )
-
-        # Calculate start and end indices of the resampled segment
-        if duration_s < self.resample_duration_s:
-            seg_start -= delta_samples
-            seg_end += delta_samples
+        if p_start_idx:
+            seg_start_idx = p_start_idx
+        elif r_peak_idx:
+            seg_start_idx = r_peak_idx - delta_samples // 2
         else:
-            seg_start += delta_samples
-            seg_end -= delta_samples
+            raise ValueError('Either p_start or r_peak index must be provided')
 
-        # Find resampled-segment indices
-        segment_idx = np.r_[seg_start:seg_end+1]
-        segment_sig = np.reshape(record.p_signal[segment_idx],
-                                 segment_idx.shape)
+        # Calculate end of segment index
+        seg_end_idx = seg_start_idx + delta_samples
+
+        # Get signal data within the segment
+        seg_idx = np.r_[seg_start_idx:seg_end_idx+1]
+        segment_sig = np.reshape(record.p_signal[seg_idx],
+                                 seg_idx.shape)
+
         resampled_idx = np.linspace(
-            seg_start, seg_end, num=self.resample_num_samples, endpoint=True
+            seg_start_idx, seg_end_idx,
+            num=self.resample_num_samples, endpoint=True
         )
 
         # Interpolation
-        interpolator = interp.interp1d(segment_idx, segment_sig)
+        interpolator = interp.interp1d(seg_idx, segment_sig)
         segment_sig_resampled = interpolator(resampled_idx)
 
         return segment_sig_resampled

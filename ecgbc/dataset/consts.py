@@ -15,9 +15,10 @@ ECG_CHANNEL_PATTERN = r'ECG|lead\si+|MLI+|v\d|\bI+\b'
 
 """
 Regex pattern for ECG beat annotations used for extracting single beats.
+Detects from start of p-wave to end of t-wave.
 Should be compiled with re.VERBOSE.
 """
-BEAT_ANNOTATIONS_PATTERN = r'''
+BEAT_ANNOTATIONS_PATTERN_FULL = r'''
     (?P<p_start>
         \(
     )
@@ -46,3 +47,9 @@ BEAT_ANNOTATIONS_PATTERN = r'''
         \)
     )
 '''
+
+"""
+Regex pattern for ECG beat annotations used for extracting single beats.
+Detects all possible types of R-peaks.
+"""
+BEAT_ANNOTATIONS_PATTERN_PEAKS_ONLY = r'(?P<r>[NVSFQLRBAaJrFejnE/f])'
