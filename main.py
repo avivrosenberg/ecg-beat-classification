@@ -16,7 +16,7 @@ def parse_cli():
             return dirname
 
     parser = argparse.ArgumentParser(
-        prog='ecgbc', description='ECG single beat classification'
+        description='ECG single beat classification'
     )
     subparsers = parser.add_subparsers(help='Sub-command help')
 
@@ -32,10 +32,16 @@ def parse_cli():
                                     help='Apply lowpass-filter')
     subparser_generate.add_argument('--transform-sma', action='store_true',
                                     help='Subtract moving average')
+    subparser_generate.add_argument('--filter-rri', action='store_true',
+                                    help='Filter out non physiological RR'
+                                         'intervals')
     subparser_generate.add_argument('--ann-ext', '-a', type=str, default='atr',
                                     help='Input annotation extension')
     subparser_generate.add_argument('--rec-pattern', type=str, default=None,
                                     help='Pattern for matching record names')
+    subparser_generate.add_argument('--aami', '-A', action='store_true',
+                                    default=None,
+                                    help='Create AAMI compatible class labels')
 
     return parser.parse_args()
 
@@ -57,10 +63,14 @@ def generate_dataset(in_dir, out_dir, ann_ext, **kwargs):
 
     generator = ecgbc.dataset.wfdb_single_beat.Generator(
         wfdb_dataset, in_ann_ext=ann_ext, out_ann_ext=f'ecg{ann_ext}',
-        calculate_rr_features=True, filter_rri=False
+        calculate_rr_features=True, filter_rri=kwargs['filter_rri'],
+        aami_compatible=kwargs['aami']
     )
 
     generator.write(out_dir)
+
+    dataset = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(out_dir)
+    print(dataset)
 
 
 if __name__ == '__main__':
