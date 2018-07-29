@@ -16,7 +16,31 @@ import physionet_tools.ecgpuwave
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
 
 
-class Dataset(torchvision.datasets.DatasetFolder):
+class DatasetFolder(torchvision.datasets.DatasetFolder):
+    def __init__(self, root, loader, extensions, transform=None,
+                 target_transform=None):
+        super(DatasetFolder, self).__init__(
+            root, loader, extensions, transform=transform,
+            target_transform=target_transform)
+
+        self.idx_to_class = {idx: cls
+                             for cls, idx in self.class_to_idx.items()}
+
+    def samples_per_class(self):
+        samples_per_class = {cls: 0 for cls in self.classes}
+        for _, class_idx in self.samples:
+            samples_per_class[self.idx_to_class[class_idx]] += 1
+        return samples_per_class
+
+    def __repr__(self):
+        fmt_str = super(DatasetFolder, self).__repr__()
+        fmt_str += '\n'
+        fmt_str +=\
+            '    Samples per class: {}\n'.format(self.samples_per_class())
+        return fmt_str
+
+
+class SingleBeatDataset(DatasetFolder):
     """
     A dataset of WFDB single beats.
     Use the Generator class in this module to write a dataset based on WFDB

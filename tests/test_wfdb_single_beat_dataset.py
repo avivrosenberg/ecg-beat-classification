@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from ecgbc.dataset.wfdb_dataset import WFDBDataset
-from ecgbc.dataset.wfdb_single_beat import Generator, Dataset
+from ecgbc.dataset.wfdb_single_beat import Generator, SingleBeatDataset
 from tests import TEST_RESOURCES_PATH
 
 WFDB_TEST_RESOURCES_PATH = f'{TEST_RESOURCES_PATH}/wfdb'
@@ -90,7 +90,7 @@ class WFDBSingleBeatDatasetTest(unittest.TestCase):
 
         # Act
         generator.write(GENERATOR_OUTPUT_FOLDER)
-        dataset = Dataset(GENERATOR_OUTPUT_FOLDER)
+        dataset = SingleBeatDataset(GENERATOR_OUTPUT_FOLDER)
         all_seg_paths = glob.glob(f'{GENERATOR_OUTPUT_FOLDER}/**/*.npy')
         all_seg_labels = [
             os.path.basename(p) for p in
