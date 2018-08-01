@@ -45,12 +45,12 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self.decoder = nn.Linear(input_size, output_size, bias=True)
+        self.ext_weights = ext_weights
 
-        if ext_weights is not None:
-            assert ext_weights.shape[0] == output_size
-            assert ext_weights.shape[1] == input_size
+        if self.ext_weights is not None:
+            assert self.ext_weights.shape[0] == output_size
+            assert self.ext_weights.shape[1] == input_size
             self.decoder.weight = None
-            self.ext_weights = ext_weights
 
     def forward(self, x):
         if self.ext_weights is not None:
