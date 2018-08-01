@@ -155,3 +155,15 @@ class LowPassFilterWFDB(object):
                                                    axis=axis)
 
         return filtered_signal
+
+
+class Normalize1D(object):
+    def __init__(self, mean=0, std=1):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, x):
+        xmean = x.mean()
+        xstd = x.std()
+
+        return (x - xmean) * (self.std / xstd) + self.mean
