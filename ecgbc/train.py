@@ -31,7 +31,7 @@ def train_autoencoder(ds_train, batch_size=DEFAULT_BATCH_SIZE,
                       num_epochs=DEFAULT_NUM_EPOCHS,
                       noise_std=DEFAULT_NOISE_STD,
                       target_activation=0.05,
-                      reg_coeff=(1.0, .0, .0, .0),
+                      reg_coeff=(1.0, .5, .5),
                       **kwargs):
     """
     Trains a Denoising Autoencoder in an unsupervised fashion.
@@ -57,13 +57,8 @@ def train_autoencoder(ds_train, batch_size=DEFAULT_BATCH_SIZE,
     num_classes = len(train_dataset.idx_to_class.keys())
 
     encoder = models.Encoder(feature_size, hidden_layer_sizes)
-    print(encoder)
-
-    # Part I - Unsupervised training
-    for h_idx in range(len(hidden_layer_sizes)):
-        encoder_weights = encoder.get_layer_weights(h_idx).t()
-        decoder = models.Decoder(hidden_layer_sizes[-1], feature_size,
-                                 ext_weights=encoder_weights)
+    decoder = models.Decoder(hidden_layer_sizes[-1], feature_size)
+    print(encoder, decoder)
 
     opt_params = set(itertools.chain(encoder.parameters(),
                                      decoder.parameters()))
