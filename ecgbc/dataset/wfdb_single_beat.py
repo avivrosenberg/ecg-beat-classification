@@ -47,11 +47,12 @@ class SingleBeatDataset(DatasetFolder):
     records to some folder. Then, this class cal be used to load the samples
     from that folder.
     """
-    def __init__(self, root_folder):
-        super().__init__(root_folder, self.load_segment, ['.npy'])
+    def __init__(self, root_folder, transform=None):
+        super().__init__(root_folder, self.load_segment, ['.npy'],
+                         transform=transform)
 
     def load_segment(self, path):
-        return np.load(path)
+        return np.float32(np.load(path))
 
 
 class Generator(object):
