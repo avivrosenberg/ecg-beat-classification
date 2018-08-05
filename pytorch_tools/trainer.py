@@ -4,6 +4,7 @@ import time
 
 import torch
 import torch.utils.data.dataloader as tdl
+import tqdm
 
 
 class ModelTrainer(abc.ABC):
@@ -25,12 +26,14 @@ class ModelTrainer(abc.ABC):
 
     def train(self, dl_train: tdl.DataLoader, verbose=False):
         self.model.train()
-        return _foreach_dataloader(dl_train, self.train_batch, verbose)
+        progress_bar = 'Train' if verbose else None
+        return _foreach_dataloader(dl_train, self.train_batch, progress_bar)
 
     def test(self, dl_test: tdl.DataLoader, verbose=False):
         self.model.eval()
+        progress_bar = 'Test' if verbose else None
         with torch.autograd.no_grad():
-            return _foreach_dataloader(dl_test, self.test_batch, verbose)
+            return _foreach_dataloader(dl_test, self.test_batch, progress_bar)
 
     def fit(self, dl_train, dl_test, num_epochs, verbose=False):
         results = []
@@ -42,7 +45,8 @@ class ModelTrainer(abc.ABC):
             train_loss = self.train(dl_train, verbose)
             test_loss = self.test(dl_test, verbose)
 
-            results.append(dict(train_loss=train_loss.item(),
+            results.append(dict(epoch=epoch,
+                                train_loss=train_loss.item(),
                                 test_loss=test_loss.item()))
         return results
 
@@ -67,24 +71,34 @@ class ModelTrainer(abc.ABC):
         raise NotImplementedError()
 
 
-def _foreach_dataloader(loader: tdl.DataLoader, forward_fn, verbose=False):
+def _foreach_dataloader(loader: tdl.DataLoader, forward_fn, progress=None):
     avg_loss = torch.tensor(0.0)
     num_batches = math.ceil(len(loader.dataset) / loader.batch_size)
+
+    pbar = None
 
     def process_item(i, d):
         return forward_fn(d)
 
-    def process_item_verbose(i, d):
-        print(f'Batch {i+1}/{num_batches}: ', end='')
-        t = time.time()
+    def process_item_with_pbar(i, d):
         loss = forward_fn(d)
-        print(f'{loss.item():.3f} ({time.time()-t:.3f} sec)')
+        pbar.set_description(f'{progress} ({loss.item():.3f})')
+        pbar.update(i)
         return loss
 
-    process_fn = process_item_verbose if verbose else process_item
+    if progress is not None:
+        total = math.ceil(len(loader.dataset) / loader.batch_size)
+        pbar = tqdm.tqdm(desc=progress, total=total)
+        process_fn = process_item_with_pbar
+    else:
+        process_fn = process_item
 
     for batch_idx, data in enumerate(loader):
         avg_loss += process_fn(batch_idx, data)
 
     avg_loss /= num_batches
+
+    if pbar:
+        pbar.set_description(f'{progress} (Avg. {avg_loss.item():.3f})')
+
     return avg_loss
