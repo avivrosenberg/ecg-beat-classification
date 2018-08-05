@@ -12,7 +12,7 @@ import torchvision.transforms
 import ecgbc.dataset.transforms
 import ecgbc.dataset.wfdb_dataset
 import ecgbc.dataset.wfdb_single_beat
-import ecgbc.models.DAE
+import ecgbc.models
 import ecgbc.autoencoder
 import ecgbc.classifier
 

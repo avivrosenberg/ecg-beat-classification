@@ -1,9 +1,8 @@
 import numpy as np
 import torch
 import torch.utils.data
-import torch.nn.functional as nnfunc
 
-import ecgbc.models.DAE as models
+import ecgbc.models as models
 
 import pytorch_tools.trainer as trainer
 import pytorch_tools.tuner as tuner
