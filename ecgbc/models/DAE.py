@@ -18,6 +18,7 @@ class Encoder(nn.Module):
             prev_layer_size = curr_layer_size
 
         self.num_layers = len(hidden_layer_sizes)
+        self.output_feature_size = prev_layer_size
 
     def forward(self, x):
         y = x
@@ -72,3 +73,13 @@ class Classifier(nn.Module):
         return self.classifier(x)
 
 
+class AutoEncoder(nn.Module):
+
+    def __init__(self, feature_size=54, hidden_layer_sizes=(100,)):
+        super(AutoEncoder, self).__init__()
+
+        self.encoder = Encoder(feature_size, hidden_layer_sizes)
+        self.decoder = Decoder(hidden_layer_sizes[-1], feature_size)
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
