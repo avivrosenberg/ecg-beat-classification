@@ -14,7 +14,7 @@ DEFAULT_HIDDEN_LAYER_SIZES = (100,)
 DEFAULT_NUM_CLASSES = 5
 DEFAULT_LEARN_RATE = 1
 DEFAULT_MOMENTUM = 0.5
-DEFAULT_WEIGHT_DECAY = 0.9
+DEFAULT_WEIGHT_DECAY = 0.1
 
 
 class Trainer(trainer.ModelTrainer):
@@ -88,7 +88,7 @@ class Tuner(tuner.HyperparameterTuner):
             num_classes=DEFAULT_NUM_CLASSES,
             learn_rate=10 ** np.random.uniform(-0.3, 0.1),
             momentum=10 ** np.random.uniform(-0.4, 0),
-            weight_decay=10 ** np.random.uniform(-0.4, 0),
+            weight_decay=10 ** np.random.uniform(-1.1, -0.3),
         )
 
     def create_trainer(self, hypers: dict) -> trainer.ModelTrainer:
