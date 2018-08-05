@@ -87,7 +87,7 @@ def parse_cli():
                               help='Load model state file', required=False)
         sp_train.add_argument('--save-model', '-S', type=str, default=None,
                               help='Save model state file', required=False)
-        sp_train.add_argument('--out', '-o', type=str, default=None,
+        sp_train.add_argument('--save-losses', '-o', type=str, default=None,
                               help='Save training losses', required=False)
 
     return p.parse_args()
@@ -153,7 +153,7 @@ def debug(dataset_dir, **kwargs):
 
 
 def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
-          load_model=None, save_model=None, out=None, **kwargs):
+          load_model=None, save_model=None, save_losses=None, **kwargs):
 
     # Create data sets and loaders
     data_tf = torchvision.transforms.Compose([
@@ -170,21 +170,23 @@ def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
     dl_test = torch.utils.data.DataLoader(ds_test, **dl_args)
 
     feature_size = ds_train[0][0].shape[0]
+    num_classes = len(ds_train.class_to_idx.keys())
     print("Test", ds_test)
     print("Train", ds_train)
 
     # Create trainer & fit model
     trainer = trainer_class(load_params_file=load_model,
-                            feature_size=feature_size)
+                            feature_size=feature_size,
+                            num_classes=num_classes)
 
     result = trainer.fit(dl_train, dl_test, num_epochs, verbose=True)
 
     # Write outputs
     if save_model is not None:
-        torch.save(trainer.model.state_dict(), save_model)
+        torch.save(trainer.model.state_dict(), f'{save_model}.pt')
 
-    if out is not None:
-        with open(out, mode='w', encoding='utf-8') as f:
+    if save_losses is not None:
+        with open(f'{save_losses}.json', mode='w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, sort_keys=True)
 
 
