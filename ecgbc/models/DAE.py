@@ -3,7 +3,7 @@ import torch.nn.functional as nnfunc
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_feature_size=54, hidden_layer_sizes=(100,)):
+    def __init__(self, input_feature_size, hidden_layer_sizes):
         super(Encoder, self).__init__()
 
         layers = []
@@ -60,26 +60,26 @@ class Decoder(nn.Module):
             return self.decoder(x)
 
 
-class Classifier(nn.Module):
-    def __init__(self, feature_size, num_classes):
-        super(Classifier, self).__init__()
-
-        self.classifier = nn.Sequential(
-            nn.Linear(feature_size, num_classes, bias=True),
-            nn.Softmax(dim=1)  # 0 is the batch dimension
-        )
-
-    def forward(self, x):
-        return self.classifier(x)
-
-
 class AutoEncoder(nn.Module):
+    def __init__(self, inout_feature_size, hidden_layer_sizes):
+        super().__init__()
 
-    def __init__(self, feature_size=54, hidden_layer_sizes=(100,)):
-        super(AutoEncoder, self).__init__()
-
-        self.encoder = Encoder(feature_size, hidden_layer_sizes)
-        self.decoder = Decoder(hidden_layer_sizes[-1], feature_size)
+        self.encoder = Encoder(inout_feature_size, hidden_layer_sizes)
+        self.decoder = Decoder(hidden_layer_sizes[-1], inout_feature_size)
 
     def forward(self, x):
         return self.decoder(self.encoder(x))
+
+
+class AutoEncoderClassifier(AutoEncoder):
+    def __init__(self, feature_size, hidden_layer_sizes, num_classes):
+        super().__init__(feature_size, hidden_layer_sizes)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(feature_size, num_classes, bias=True),
+            nn.LogSoftmax(dim=1)  # 0 is the batch dimension
+        )
+
+    def forward(self, x):
+        return self.classifier(self.encoder(x))
+
