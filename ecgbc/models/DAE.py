@@ -76,7 +76,7 @@ class AutoEncoderClassifier(AutoEncoder):
         super().__init__(feature_size, hidden_layer_sizes)
 
         self.classifier = nn.Sequential(
-            nn.Linear(feature_size, num_classes, bias=True),
+            nn.Linear(hidden_layer_sizes[-1], num_classes, bias=True),
             nn.LogSoftmax(dim=1)  # 0 is the batch dimension
         )
 
