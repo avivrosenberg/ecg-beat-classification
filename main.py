@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pdb
 
@@ -12,11 +13,11 @@ import ecgbc.dataset.transforms
 import ecgbc.dataset.wfdb_dataset
 import ecgbc.dataset.wfdb_single_beat
 import ecgbc.models.DAE
-import ecgbc.train
+import ecgbc.autoencoder
+import ecgbc.classifier
 
 DEFAULT_NUM_EPOCHS = 10
 DEFAULT_BATCH_SIZE = 128
-DEFAULT_NOISE_STD = 0.1
 
 
 def parse_cli():
@@ -25,6 +26,12 @@ def parse_cli():
             raise argparse.ArgumentTypeError(f'{dirname} is not a directory')
         else:
             return dirname
+
+    def is_file(filename):
+        if not os.path.isfile(filename):
+            raise argparse.ArgumentTypeError(f'{filename} is not a file')
+        else:
+            return filename
 
     p = argparse.ArgumentParser(description='ECG single beat classification')
     sp = p.add_subparsers(help='Sub-command help')
@@ -59,21 +66,29 @@ def parse_cli():
                           help='Show dataset', required=True)
 
     # Training
-    sp_train = sp.add_parser('train', help='Train ECG Beat classifier')
-    sp_train.set_defaults(subcmd_fn=ecgbc.train.train_autoencoder)
-    sp_train.add_argument('--ds-train', '-d', type=is_dir,
-                             help='Training dataset dir', required=True)
-    sp_train.add_argument('--ds-test', '-D', type=is_dir,
-                          help='Test dataset dir', required=True)
-    sp_train.add_argument('--num-epochs', '-e', type=int,
-                          default=DEFAULT_NUM_EPOCHS,
-                          help='Number of epochs', required=False)
-    sp_train.add_argument('--batch-size', '-b', type=int,
-                          default=DEFAULT_BATCH_SIZE,
-                          help='Training batch size', required=False)
-    sp_train.add_argument('--noise-std', '-n', type=float,
-                          default=DEFAULT_NOISE_STD,
-                          help='Noise standard deviation', required=False)
+    sp_train_dae = sp.add_parser('train-dae', help='Train DAE on ECG beats')
+    sp_train_dae.set_defaults(subcmd_fn=train_dae)
+
+    sp_train_cls = sp.add_parser('train-cls', help='Train ECG beat classifier')
+    sp_train_cls.set_defaults(subcmd_fn=train_cls)
+
+    for sp_train in (sp_train_dae, sp_train_cls):
+        sp_train.add_argument('--ds-train', '-d', type=is_dir,
+                                 help='Training dataset dir', required=True)
+        sp_train.add_argument('--ds-test', '-D', type=is_dir,
+                              help='Test dataset dir', required=True)
+        sp_train.add_argument('--num-epochs', '-e', type=int,
+                              default=DEFAULT_NUM_EPOCHS,
+                              help='Number of epochs', required=False)
+        sp_train.add_argument('--batch-size', '-b', type=int,
+                              default=DEFAULT_BATCH_SIZE,
+                              help='Training batch size', required=False)
+        sp_train.add_argument('--load-model', '-L', type=is_file, default=None,
+                              help='Load model state file', required=False)
+        sp_train.add_argument('--save-model', '-S', type=str, default=None,
+                              help='Save model state file', required=False)
+        sp_train.add_argument('--out', '-o', type=str, default=None,
+                              help='Save training losses', required=False)
 
     return p.parse_args()
 
@@ -135,6 +150,50 @@ def debug(dataset_dir, **kwargs):
             label_color = cmap.colors[label_idx]
             ax.text(0, 0, label_text, color=label_color, weight='bold')
         pdb.set_trace()
+
+
+def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
+          load_model=None, save_model=None, out=None, **kwargs):
+
+    # Create data sets and loaders
+    data_tf = torchvision.transforms.Compose([
+        ecgbc.dataset.transforms.Normalize1D()
+    ])
+
+    ds_train = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
+        ds_train, transform=data_tf)
+    ds_test = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
+        ds_test, transform=data_tf)
+    dl_args = dict(batch_size=batch_size, shuffle=True, num_workers=2,
+                   drop_last=False)
+    dl_train = torch.utils.data.DataLoader(ds_train, **dl_args)
+    dl_test = torch.utils.data.DataLoader(ds_test, **dl_args)
+
+    feature_size = ds_train[0][0].shape[0]
+    print("Test", ds_test)
+    print("Train", ds_train)
+
+    # Create trainer & fit model
+    trainer = trainer_class(load_params_file=load_model,
+                            feature_size=feature_size)
+
+    result = trainer.fit(dl_train, dl_test, num_epochs, verbose=True)
+
+    # Write outputs
+    if save_model is not None:
+        torch.save(trainer.model.state_dict(), save_model)
+
+    if out is not None:
+        with open(out, mode='w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, sort_keys=True)
+
+
+def train_dae(**kwargs):
+    train(ecgbc.autoencoder.Trainer, **kwargs)
+
+
+def train_cls(**kwargs):
+    train(ecgbc.classifier.Trainer, **kwargs)
 
 
 if __name__ == '__main__':
