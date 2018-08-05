@@ -4,6 +4,7 @@ db/
 db
 tests/resources/**/*.ecgatr
 wfdb_testing.ipynb
+out/
 
 ### Linux ###
 *~
