@@ -6,50 +6,27 @@ import re
 import numpy as np
 import scipy.interpolate as interp
 import scipy.signal as signal
-import torchvision
 import tqdm
 import wfdb
 
 import ecgbc.dataset
 import physionet_tools.ecgpuwave
+import pytorch_tools.data
 
-from ecgbc.dataset.wfdb_dataset import WFDBDataset
-
-
-class DatasetFolder(torchvision.datasets.DatasetFolder):
-    def __init__(self, root, loader, extensions, transform=None,
-                 target_transform=None):
-        super(DatasetFolder, self).__init__(
-            root, loader, extensions, transform=transform,
-            target_transform=target_transform)
-
-        self.idx_to_class = {idx: cls
-                             for cls, idx in self.class_to_idx.items()}
-
-    def samples_per_class(self):
-        samples_per_class = {cls: 0 for cls in self.classes}
-        for _, class_idx in self.samples:
-            samples_per_class[self.idx_to_class[class_idx]] += 1
-        return samples_per_class
-
-    def __repr__(self):
-        fmt_str = super(DatasetFolder, self).__repr__()
-        fmt_str += '\n'
-        fmt_str +=\
-            '    Samples per class: {}\n'.format(self.samples_per_class())
-        return fmt_str
+from .wfdb_dataset import WFDBDataset
 
 
-class SingleBeatDataset(DatasetFolder):
+class SingleBeatDataset(pytorch_tools.data.DatasetFolder):
     """
     A dataset of WFDB single beats.
     Use the Generator class in this module to write a dataset based on WFDB
     records to some folder. Then, this class cal be used to load the samples
     from that folder.
     """
-    def __init__(self, root_folder, transform=None):
+
+    def __init__(self, root_folder, transform=None, **kwargs):
         super().__init__(root_folder, self.load_segment, ['.npy'],
-                         transform=transform)
+                         transform=transform, **kwargs)
 
     def load_segment(self, path):
         return np.float32(np.load(path))
@@ -270,7 +247,7 @@ class Generator(object):
 
         # Resample the RR intervals with uniform rate so we can apply filters
         fs_resampled = 4  # Hz
-        rrt_rs = np.r_[rrt[0]:rrt[-1]:1/fs_resampled]
+        rrt_rs = np.r_[rrt[0]:rrt[-1]:1 / fs_resampled]
         rri_rs = interp.interp1d(rrt, rri)(rrt_rs)
 
         def sliding_window_mean(sig, m):
@@ -333,9 +310,8 @@ class Generator(object):
         seg_end_idx = seg_start_idx + delta_samples
 
         # Get signal data within the segment
-        seg_idx = np.r_[seg_start_idx:seg_end_idx+1]
-        segment_sig = np.reshape(record.p_signal[seg_idx],
-                                 seg_idx.shape)
+        seg_idx = np.r_[seg_start_idx:seg_end_idx + 1]
+        segment_sig = np.reshape(record.p_signal[seg_idx], seg_idx.shape)
 
         resampled_idx = np.linspace(
             seg_start_idx, seg_end_idx,
@@ -358,4 +334,3 @@ class Generator(object):
                 return None
 
         return wfdb.rdann(record_path, self.out_ann_ext)
-
