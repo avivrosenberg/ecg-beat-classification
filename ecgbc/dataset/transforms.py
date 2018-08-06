@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as scipysignal
+import torch
 
 
 class AbstractBaselineRemovalWFDB(object):
@@ -167,3 +168,8 @@ class Normalize1D(object):
         xstd = x.std()
 
         return (x - xmean) * (self.std / xstd) + self.mean
+
+
+class ToTensor(object):
+    def __call__(self, x):
+        return torch.tensor(x)
