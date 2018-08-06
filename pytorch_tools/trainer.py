@@ -83,7 +83,7 @@ def _foreach_dataloader(loader: tdl.DataLoader, forward_fn, progress=None):
     def process_item_with_pbar(i, d):
         loss = forward_fn(d)
         pbar.set_description(f'{progress} ({loss.item():.3f})')
-        pbar.update(i)
+        pbar.update()
         return loss
 
     if progress is not None:
