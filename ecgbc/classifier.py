@@ -92,9 +92,9 @@ class Tuner(tuner.HyperparameterTuner):
             feature_size=DEFAULT_FEATURE_SIZE,
             hidden_layer_sizes=DEFAULT_HIDDEN_LAYER_SIZES,
             num_classes=DEFAULT_NUM_CLASSES,
-            learn_rate=10 ** np.random.uniform(-0.3, 0.1),
+            learn_rate=10 ** np.random.uniform(-0.5, 0.1),
             momentum=10 ** np.random.uniform(-0.4, 0),
-            weight_decay=10 ** np.random.uniform(-1.1, -0.3),
+            weight_decay=10 ** np.random.uniform(-2.5, -0.3),
         )
 
     def create_trainer(self, hypers: dict) -> trainer.ModelTrainer:
