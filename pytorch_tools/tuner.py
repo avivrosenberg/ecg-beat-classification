@@ -2,6 +2,7 @@ import abc
 import json
 
 import torch
+import torch.utils.data as tud
 
 from .data import create_train_validation_loaders
 from .trainer import ModelTrainer
@@ -38,7 +39,7 @@ class HyperparameterTuner(abc.ABC):
         """
         pass
 
-    def tune(self, ds_train, output_filename=None):
+    def tune(self, ds_train: tud.Dataset, output_filename=None):
         """
         Tune model hyperparameters with k-fold cross-validation.
 
@@ -68,13 +69,13 @@ class HyperparameterTuner(abc.ABC):
                 trainer = self.create_trainer(hypers)
 
                 print(f'# Tuning ({i+1}/{self.max_iter}), k={k}, Train:')
-                train_loss = trainer.train(dl_train, verbose=True)
+                train_res = trainer.train(dl_train, verbose=True)
 
                 print(f'# Tuning ({i+1}/{self.max_iter}), k={k}, Test:')
-                valid_loss = trainer.test(dl_valid, verbose=True)
+                valid_res = trainer.test(dl_valid, verbose=True)
 
-                avg_train_loss += train_loss
-                avg_valid_loss += valid_loss
+                avg_train_loss += train_res.avg_loss
+                avg_valid_loss += valid_res.avg_loss
 
             avg_train_loss /= self.cv_k
             avg_valid_loss /= self.cv_k
