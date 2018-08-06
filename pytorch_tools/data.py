@@ -50,20 +50,13 @@ class DatasetFolder(torchvision.datasets.DatasetFolder):
     Extends the DatasetFolder form torchvision to add some useful features.
     """
     def __init__(self, root, loader, extensions, transform=None,
-                 target_transform=None, ignore_classes: list=None):
+                 target_transform=None):
 
         super().__init__(root, loader, extensions, transform=transform,
                          target_transform=target_transform)
 
         self.idx_to_class = \
             {idx: cls for cls, idx in self.class_to_idx.items()}
-
-        self.ignore_classes = ignore_classes
-        if self.ignore_classes:
-            self.samples = [
-                (data, class_idx) for data, class_idx in self.samples
-                if self.idx_to_class[class_idx] not in ignore_classes
-            ]
 
     def samples_per_class(self):
         samples_per_class = {cls: 0 for cls in self.classes}
@@ -74,9 +67,62 @@ class DatasetFolder(torchvision.datasets.DatasetFolder):
     def __repr__(self):
         fmt_str = super().__repr__()
         fmt_str += '\n'
-        fmt_str +=\
-            '    Samples per class: {}\n'.format(self.samples_per_class())
-        if self.ignore_classes:
-            fmt_str += \
-                '    Ignored classes: {}\n'.format(self.ignore_classes)
+        fmt_str += f'    Samples per class: {self.samples_per_class()}'
+        return fmt_str
+
+
+class SubsetDatasetFolder(DatasetFolder):
+    """
+    A dataset folder that only loads a subset of the data in the given
+    folder. Useful for ignoring classes or taking a small portion of a dataset.
+    """
+    def __init__(self, root, loader, extensions, subset: dict=None,
+                 transform=None, target_transform=None, random_order=False):
+
+        super().__init__(root, loader, extensions, transform=transform,
+                         target_transform=target_transform)
+
+        if subset is None:
+            self.subset = None
+            return
+
+        self.subset = dict(subset)
+
+        samples_idx = list(range(len(self.samples)))
+        if random_order:
+            samples_idx = np.random.permutation(samples_idx)
+
+        for class_label in self.classes:
+            if class_label not in self.subset:
+                self.subset[class_label] = math.inf
+
+        # Create new class labels and mapping for classes that have at least
+        # one sample
+        new_classes = [label for label, num in self.subset.items() if num > 0]
+        new_class_to_idx = {cls: idx for idx, cls in enumerate(new_classes)}
+        new_idx_to_class = {idx: cls for cls, idx in new_class_to_idx.items()}
+
+        # Take requested subset of the data and change class indices
+        new_samples = []
+        for idx in samples_idx:
+            (path, class_idx) = self.samples[idx]
+            class_label = self.idx_to_class[class_idx]
+            if self.subset[class_label] > 0:
+                new_class_idx = new_class_to_idx[class_label]
+                new_samples.append((path, new_class_idx))
+                self.subset[class_label] -= 1
+
+        # Replace old with new
+        self.samples = new_samples
+        self.classes = new_classes
+        self.class_to_idx = new_class_to_idx
+        self.idx_to_class = new_idx_to_class
+
+    def __repr__(self):
+        fmt_str = super().__repr__()
+        fmt_str += '\n'
+        if self.subset is not None:
+            subset_disp = {k: v for k, v in self.subset.items()
+                           if not math.isinf(v)}
+            fmt_str += f'    Subset loaded per class: {subset_disp}'
         return fmt_str
