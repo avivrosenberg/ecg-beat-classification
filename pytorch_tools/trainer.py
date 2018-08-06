@@ -133,8 +133,8 @@ def _foreach_batch(loader: tdl.DataLoader,
     total_loss = 0.0
     num_correct = 0
 
-    num_samples = len(loader.dataset)
-    num_batches = math.ceil(num_samples / loader.batch_size)
+    num_samples = len(loader.sampler)
+    num_batches = len(loader.batch_sampler)
 
     def process_item(i, d):
         return forward_fn(d)
@@ -146,8 +146,7 @@ def _foreach_batch(loader: tdl.DataLoader,
         return bres
 
     if progress is not None:
-        total = math.ceil(len(loader.dataset) / loader.batch_size)
-        pbar = tqdm.tqdm(desc=progress, total=total)
+        pbar = tqdm.tqdm(desc=progress, total=num_batches)
         process_fn = process_item_with_pbar
     else:
         process_fn = process_item
