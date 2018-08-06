@@ -18,6 +18,8 @@ import ecgbc.classifier
 
 DEFAULT_NUM_EPOCHS = 10
 DEFAULT_BATCH_SIZE = 128
+DEFAULT_TUNING_MAX_ITER = 50
+DEFAULT_CV_K = 5
 
 
 def parse_cli():
@@ -89,6 +91,31 @@ def parse_cli():
                               help='Save model state file', required=False)
         sp_train.add_argument('--save-losses', '-o', type=str, default=None,
                               help='Save training losses', required=False)
+
+    # Tuning
+    sp_tune_dae = sp.add_parser('tune-dae', help='Tune DAE hyperparams')
+    sp_tune_dae.set_defaults(subcmd_fn=tune_dae)
+
+    sp_tune_cls = sp.add_parser('tune-cls',
+                                 help='Tune beat classifier hyperparams')
+    sp_tune_cls.set_defaults(subcmd_fn=tune_cls)
+
+    for sp_tune in (sp_tune_dae, sp_tune_cls):
+        sp_tune.add_argument('--ds', '-d', type=is_dir,
+                              help='Dataset dir', required=True)
+        sp_tune.add_argument('--max-iter', '-i', type=int,
+                             default=DEFAULT_TUNING_MAX_ITER,
+                             help='Max number of tuning iterations',
+                             required=False)
+        sp_tune.add_argument('--batch-size', '-b', type=int,
+                              default=DEFAULT_BATCH_SIZE,
+                              help='Batch size', required=False)
+        sp_tune.add_argument('--cv-k', '-c', type=int,
+                             default=DEFAULT_CV_K,
+                             help='Cross validation K', required=False)
+        sp_tune.add_argument('--output-filename', '-o', type=str,
+                              default=None, help='Save tuning results to file',
+                              required=False)
 
     return p.parse_args()
 
@@ -210,6 +237,30 @@ def train_dae(**kwargs):
 
 def train_cls(**kwargs):
     train(ecgbc.classifier.Trainer, **kwargs)
+
+
+def tune(tuner_class, ds, max_iter, batch_size, cv_k, output_filename,
+         **kwargs):
+
+    # Create data set
+    data_tf = ecgbc.dataset.transforms.Normalize1D()
+    subset = dict(Q=0,)
+
+    ds = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
+        ds, transform=data_tf, subset=subset)
+
+    tuner = tuner_class(max_iter=max_iter, batch_size=batch_size, cv_k=cv_k)
+    best_hypers = tuner.tune(ds, output_filename=output_filename)
+
+    print("Best hyperparameters:", best_hypers)
+
+
+def tune_dae(**kwargs):
+    tune(ecgbc.autoencoder.Tuner, **kwargs)
+
+
+def tune_cls(**kwargs):
+    tune(ecgbc.classifier.Tuner, **kwargs)
 
 
 if __name__ == '__main__':
