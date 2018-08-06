@@ -59,24 +59,31 @@ class Trainer(trainer.ModelTrainer):
     def create_loss(self) -> torch.nn.Module:
         return torch.nn.NLLLoss()
 
-    def train_batch(self, dl_sample) -> torch.Tensor:
-        (samples, targets) = dl_sample
+    def train_batch(self, dl_batch) -> trainer.BatchResult:
+        (samples, targets) = dl_batch
 
-        predicted_labels = self.model(samples)
+        class_log_probability = self.model(samples)
 
-        loss = self.loss_fn(predicted_labels, targets)
+        loss = self.loss_fn(class_log_probability, targets)
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
-        return loss
+        _, predicted_class = class_log_probability.max(dim=1)
+        num_correct = predicted_class.eq(targets).sum().item()
 
-    def test_batch(self, dl_sample) -> torch.Tensor:
-        (samples, targets) = dl_sample
-        predicted_labels = self.model(samples)
-        loss = self.loss_fn(predicted_labels, targets)
-        return loss
+        return trainer.BatchResult(loss=loss.item(), num_correct=num_correct)
+
+    def test_batch(self, dl_batch) -> trainer.BatchResult:
+        (samples, targets) = dl_batch
+        class_log_probability = self.model(samples)
+        loss = self.loss_fn(class_log_probability, targets)
+
+        _, predicted_class = class_log_probability.max(dim=1)
+        num_correct = predicted_class.eq(targets).sum().item()
+
+        return trainer.BatchResult(loss=loss.item(), num_correct=num_correct)
 
 
 class Tuner(tuner.HyperparameterTuner):

@@ -48,8 +48,8 @@ class Trainer(trainer.ModelTrainer):
             sparsity_loss_coeff=self.reg_coeff[1]
         )
 
-    def train_batch(self, dl_sample) -> torch.Tensor:
-        samples, _ = dl_sample
+    def train_batch(self, dl_batch) -> trainer.BatchResult:
+        samples, _ = dl_batch
 
         def lbfgs_step():
             samples_noised = \
@@ -64,10 +64,11 @@ class Trainer(trainer.ModelTrainer):
             loss.backward()
             return loss
 
-        return self.optimizer.step(lbfgs_step)
+        final_loss = self.optimizer.step(lbfgs_step)
+        return trainer.BatchResult(loss=final_loss.item(), num_correct=0)
 
-    def test_batch(self, dl_sample) -> torch.Tensor:
-        samples, _ = dl_sample
+    def test_batch(self, dl_batch) -> trainer.BatchResult:
+        samples, _ = dl_batch
 
         samples_noised = \
             torch.randn_like(samples) * self.noise_std + samples
@@ -75,7 +76,8 @@ class Trainer(trainer.ModelTrainer):
         samples_encoded = self.model.encoder(samples_noised)
         samples_decoded = self.model.decoder(samples_encoded)
 
-        return self.loss_fn(samples, samples_encoded, samples_decoded)
+        loss = self.loss_fn(samples, samples_encoded, samples_decoded)
+        return trainer.BatchResult(loss=loss, num_correct=0)
 
 
 class Tuner(tuner.HyperparameterTuner):
