@@ -77,7 +77,7 @@ class SubsetDatasetFolder(DatasetFolder):
     folder. Useful for ignoring classes or taking a small portion of a dataset.
     """
     def __init__(self, root, loader, extensions, subset: dict=None,
-                 transform=None, target_transform=None, random_order=False):
+                 random_order=False, transform=None, target_transform=None):
 
         super().__init__(root, loader, extensions, transform=transform,
                          target_transform=target_transform)
