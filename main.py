@@ -156,28 +156,29 @@ def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
           load_model=None, save_model=None, save_losses=None, **kwargs):
 
     # Create data sets and loaders
-    data_tf = torchvision.transforms.Compose([
-        ecgbc.dataset.transforms.Normalize1D()
-    ])
+    data_tf = ecgbc.dataset.transforms.Normalize1D()
+    subset = dict(Q=0,)
 
     ds_train = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
-        ds_train, transform=data_tf)
+        ds_train, transform=data_tf, subset=subset)
     ds_test = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
-        ds_test, transform=data_tf)
+        ds_test, transform=data_tf, subset=subset)
     dl_args = dict(batch_size=batch_size, shuffle=True, num_workers=2,
                    drop_last=False)
     dl_train = torch.utils.data.DataLoader(ds_train, **dl_args)
     dl_test = torch.utils.data.DataLoader(ds_test, **dl_args)
 
     feature_size = ds_train[0][0].shape[0]
-    num_classes = len(ds_train.class_to_idx.keys())
+    num_classes = len(ds_train.classes)
+    print("Train", ds_train, end='\n\n')
     print("Test", ds_test)
-    print("Train", ds_train)
 
     # Create trainer & fit model
     trainer = trainer_class(load_params_file=load_model,
                             feature_size=feature_size,
-                            num_classes=num_classes)
+                            num_classes=num_classes,
+                            hidden_layer_sizes=(100,),
+                            weight_decay=0, learn_rate=0.5)
 
     result = trainer.fit(dl_train, dl_test, num_epochs, verbose=True)
 
@@ -187,7 +188,20 @@ def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
 
     if save_losses is not None:
         with open(f'{save_losses}.json', mode='w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, sort_keys=True)
+            json.dump(result._asdict(), f, indent=2, sort_keys=True)
+
+
+    # Plot
+    epochs = np.arange(num_epochs)
+    fig, ax = plt.subplots(2, 1, sharex='all')
+    ax[0].plot(epochs, result.train_loss, epochs, result.test_loss)
+    ax[0].legend(['train', 'test'])
+    ax[0].set_title('Loss')
+    ax[1].plot(epochs, result.train_acc, epochs, result.test_acc)
+    ax[1].legend(['train', 'test'])
+    ax[1].set_title('Accuracy')
+    ax[1].set_xlabel('Epoch #')
+    plt.show()
 
 
 def train_dae(**kwargs):
