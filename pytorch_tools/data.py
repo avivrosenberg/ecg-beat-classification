@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 import torch
+import torchvision
 from torch.utils.data import sampler as sampler
 
 
@@ -42,3 +43,40 @@ def create_train_validation_loaders(dataset, validation_ratio, batch_size,
     )
 
     return dl_train, dl_valid
+
+
+class DatasetFolder(torchvision.datasets.DatasetFolder):
+    """
+    Extends the DatasetFolder form torchvision to add some useful features.
+    """
+    def __init__(self, root, loader, extensions, transform=None,
+                 target_transform=None, ignore_classes: list=None):
+
+        super().__init__(root, loader, extensions, transform=transform,
+                         target_transform=target_transform)
+
+        self.idx_to_class = \
+            {idx: cls for cls, idx in self.class_to_idx.items()}
+
+        self.ignore_classes = ignore_classes
+        if self.ignore_classes:
+            self.samples = [
+                (data, class_idx) for data, class_idx in self.samples
+                if self.idx_to_class[class_idx] not in ignore_classes
+            ]
+
+    def samples_per_class(self):
+        samples_per_class = {cls: 0 for cls in self.classes}
+        for _, class_idx in self.samples:
+            samples_per_class[self.idx_to_class[class_idx]] += 1
+        return samples_per_class
+
+    def __repr__(self):
+        fmt_str = super().__repr__()
+        fmt_str += '\n'
+        fmt_str +=\
+            '    Samples per class: {}\n'.format(self.samples_per_class())
+        if self.ignore_classes:
+            fmt_str += \
+                '    Ignored classes: {}\n'.format(self.ignore_classes)
+        return fmt_str
