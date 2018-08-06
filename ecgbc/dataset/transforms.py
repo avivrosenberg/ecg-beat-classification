@@ -166,8 +166,10 @@ class Normalize1D(object):
     def __call__(self, x):
         xmean = x.mean()
         xstd = x.std()
-
         return (x - xmean) * (self.std / xstd) + self.mean
+
+    def __repr__(self):
+        return f'Normalize1D({self.mean}, {self.std})'
 
 
 class ToTensor(object):

@@ -16,7 +16,7 @@ import pytorch_tools.data
 from .wfdb_dataset import WFDBDataset
 
 
-class SingleBeatDataset(pytorch_tools.data.DatasetFolder):
+class SingleBeatDataset(pytorch_tools.data.SubsetDatasetFolder):
     """
     A dataset of WFDB single beats.
     Use the Generator class in this module to write a dataset based on WFDB
