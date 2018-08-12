@@ -163,5 +163,6 @@ def _foreach_batch(loader: tdl.DataLoader,
         pbar.set_description(f'{progress} '
                              f'(Avg. Loss {avg_loss:.3f}, '
                              f'Accuracy {accuracy:.1f})')
+        pbar.close()
 
     return EpochResult(avg_loss=avg_loss, accuracy=accuracy)
