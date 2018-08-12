@@ -113,6 +113,8 @@ def parse_cli():
         sp_tune.add_argument('--cv-k', '-c', type=int,
                              default=DEFAULT_CV_K,
                              help='Cross validation K', required=False)
+        sp_tune.add_argument('--load-model', '-L', type=is_file, default=None,
+                              help='Load model state file', required=False)
         sp_tune.add_argument('--output-filename', '-o', type=str,
                               default=None, help='Save tuning results to file',
                               required=False)
@@ -239,8 +241,8 @@ def train_cls(**kwargs):
     train(ecgbc.classifier.Trainer, **kwargs)
 
 
-def tune(tuner_class, ds, max_iter, batch_size, cv_k, output_filename,
-         **kwargs):
+def tune(tuner_class, ds, max_iter, batch_size, cv_k, load_model,
+         output_filename, **kwargs):
 
     # Create data set
     data_tf = ecgbc.dataset.transforms.Normalize1D()
@@ -249,7 +251,9 @@ def tune(tuner_class, ds, max_iter, batch_size, cv_k, output_filename,
     ds = ecgbc.dataset.wfdb_single_beat.SingleBeatDataset(
         ds, transform=data_tf, subset=subset)
 
-    tuner = tuner_class(max_iter=max_iter, batch_size=batch_size, cv_k=cv_k)
+    tuner = tuner_class(max_iter=max_iter, batch_size=batch_size, cv_k=cv_k,
+                        load_params_file=load_model)
+
     best_hypers = tuner.tune(ds, output_filename=output_filename)
 
     print("Best hyperparameters:", best_hypers)
