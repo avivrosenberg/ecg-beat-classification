@@ -77,7 +77,7 @@ class Trainer(trainer.ModelTrainer):
         samples_decoded = self.model.decoder(samples_encoded)
 
         loss = self.loss_fn(samples, samples_encoded, samples_decoded)
-        return trainer.BatchResult(loss=loss, num_correct=0)
+        return trainer.BatchResult(loss=loss.item(), num_correct=0)
 
 
 class Tuner(tuner.HyperparameterTuner):
