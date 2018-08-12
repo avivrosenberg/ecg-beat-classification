@@ -16,7 +16,8 @@ DEFAULT_CROSS_VALIDATION_K = 5
 class HyperparameterTuner(abc.ABC):
     def __init__(self, max_iter=DEFAULT_MAX_ITER,
                  batch_size=DEFAULT_BATCH_SIZE,
-                 cv_k=DEFAULT_CROSS_VALIDATION_K):
+                 cv_k=DEFAULT_CROSS_VALIDATION_K,
+                 **kwargs):
 
         self.max_iter = max_iter
         self.batch_size = batch_size
@@ -68,10 +69,9 @@ class HyperparameterTuner(abc.ABC):
 
                 trainer = self.create_trainer(hypers)
 
-                print(f'# Tuning ({i+1}/{self.max_iter}), k={k}, Train:')
+                print(f'\n# Tuning ({i+1}/{self.max_iter}), k={k}, Train:')
                 train_res = trainer.train(dl_train, verbose=True)
 
-                print(f'# Tuning ({i+1}/{self.max_iter}), k={k}, Test:')
                 valid_res = trainer.test(dl_valid, verbose=True)
 
                 avg_train_loss += train_res.avg_loss
@@ -87,8 +87,8 @@ class HyperparameterTuner(abc.ABC):
                 best_hypers = hypers
 
             results.append(dict(iter=i, hypers=hypers,
-                                train_loss=avg_train_loss,
-                                valid_loss=avg_valid_loss))
+                                train_loss=avg_train_loss.item(),
+                                valid_loss=avg_valid_loss.item()))
 
         if output_filename is not None:
             output_filename = f'{output_filename}.json'
