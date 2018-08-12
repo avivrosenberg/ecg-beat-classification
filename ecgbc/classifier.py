@@ -87,8 +87,13 @@ class Trainer(trainer.ModelTrainer):
 
 
 class Tuner(tuner.HyperparameterTuner):
+    def __init__(self, load_params_file=None, **kwargs):
+        super().__init__(**kwargs)
+        self.load_params_file = load_params_file
+
     def sample_hyperparams(self) -> dict:
         return dict(
+            load_params_file=self.load_params_file,
             feature_size=DEFAULT_FEATURE_SIZE,
             hidden_layer_sizes=DEFAULT_HIDDEN_LAYER_SIZES,
             num_classes=DEFAULT_NUM_CLASSES,
