@@ -55,25 +55,67 @@ class ModelTrainer(abc.ABC):
         with torch.autograd.no_grad():
             return _foreach_batch(dl_test, self.test_batch, progress_bar)
 
-    def fit(self, dl_train, dl_test, num_epochs, verbose=False) -> FitResult:
+    def fit(self, dl_train, dl_test, num_epochs, verbose=False,
+            checkpoints: str=None, early_stopping: int=None) -> FitResult:
+        """
+        Trains the model for multiple epochs with a given training set,
+        and calculates validation loss over a given validation set.
+        :param dl_train: Dataloader for the training set.
+        :param dl_test: Dataloader for the test set.
+        :param num_epochs: Number of epochs to train for.
+        :param verbose: Whether to print output.
+        :param checkpoints: Whether to save model to file every time the
+            test loss improves. Should a string containing a filename without
+            extension.
+        :param early_stopping: Whether to stop training early if there is no
+            test loss improvement for this number of epochs.
+        :return: A FitResult object containing train and test losses per epoch.
+        """
 
+        actual_num_epochs = 0
         train_loss, train_acc, test_loss, test_acc = [], [], [], []
-        result = FitResult(num_epochs, self.hyperparams(), train_loss,
-                           train_acc, test_loss, test_acc)
+
+        best_loss = None
+        epochs_without_improvement = 0
 
         for epoch in range(num_epochs):
             if verbose:
-                print(f'*** EPOCH {epoch+1}/{num_epochs} ***')
+                print(f'\n*** EPOCH {epoch+1}/{num_epochs} ***')
 
             train_result = self.train(dl_train, verbose)
             test_result = self.test(dl_test, verbose)
 
+            actual_num_epochs += 1
             train_loss.append(train_result.avg_loss)
             train_acc.append(train_result.accuracy)
             test_loss.append(test_result.avg_loss)
             test_acc.append(test_result.accuracy)
 
-        return result
+            if best_loss is None or test_result.avg_loss < best_loss:
+                best_loss = test_result.avg_loss
+                epochs_without_improvement = 0
+
+                # Save model checkpoint if requested
+                if checkpoints is not None:
+                    checkpoint_filename = f'{checkpoints}.pt'
+
+                    torch.save(self.model.state_dict(), checkpoint_filename)
+                    if verbose:
+                        print(f'\n*** Saved checkpoint {checkpoint_filename}')
+            else:
+                epochs_without_improvement += 1
+
+                # Stop early if requested
+                if early_stopping is not None:
+                    if epochs_without_improvement >= early_stopping:
+                        if verbose:
+                            print(f'\n*** Early stopping triggered after '
+                                  f'{epochs_without_improvement} epochs '
+                                  f'without improvement')
+                        break
+
+        return FitResult(actual_num_epochs, self.hyperparams(),
+                         train_loss, train_acc, test_loss, test_acc)
 
     @abc.abstractmethod
     def create_model(self) -> torch.nn.Module:
