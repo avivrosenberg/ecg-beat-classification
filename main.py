@@ -87,8 +87,13 @@ def parse_cli():
                               help='Training batch size', required=False)
         sp_train.add_argument('--load-model', '-L', type=is_file, default=None,
                               help='Load model state file', required=False)
-        sp_train.add_argument('--save-model', '-S', type=str, default=None,
-                              help='Save model state file', required=False)
+        sp_train.add_argument('--checkpoints', '-c', type=str, default=None,
+                              help='Create a model state checkpoint '
+                                   'every time train loss improves',
+                              required=False)
+        sp_train.add_argument('--early-stopping', '-s', type=int, default=None,
+                              help='Stop after this many epochs without '
+                                   'train loss improvement', required=False)
         sp_train.add_argument('--save-losses', '-o', type=str, default=None,
                               help='Save training losses', required=False)
 
@@ -182,7 +187,8 @@ def debug(dataset_dir, **kwargs):
 
 
 def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
-          load_model=None, save_model=None, save_losses=None, **kwargs):
+          load_model=None, checkpoints=None, early_stopping=None,
+          save_losses=None, **kwargs):
 
     # Create data sets and loaders
     data_tf = ecgbc.dataset.transforms.Normalize1D()
@@ -205,15 +211,16 @@ def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
     # Create trainer & fit model
     trainer = trainer_class(load_params_file=load_model,
                             feature_size=feature_size,
-                            num_classes=num_classes,
-                            hidden_layer_sizes=(100,),
-                            weight_decay=0, learn_rate=0.5)
+                            num_classes=num_classes)
 
-    result = trainer.fit(dl_train, dl_test, num_epochs, verbose=True)
+    result = trainer.fit(dl_train, dl_test, num_epochs,
+                         checkpoints=checkpoints,
+                         early_stopping=early_stopping,
+                         verbose=True)
 
     # Write outputs
-    if save_model is not None:
-        torch.save(trainer.model.state_dict(), f'{save_model}.pt')
+    if checkpoints is not None:
+        torch.save(trainer.model.state_dict(), f'{checkpoints}.pt')
 
     if save_losses is not None:
         with open(f'{save_losses}.json', mode='w', encoding='utf-8') as f:
@@ -221,7 +228,7 @@ def train(trainer_class, ds_train, ds_test, num_epochs, batch_size,
 
 
     # Plot
-    epochs = np.arange(num_epochs)
+    epochs = np.arange(result.num_epochs)
     fig, ax = plt.subplots(2, 1, sharex='all')
     ax[0].plot(epochs, result.train_loss, epochs, result.test_loss)
     ax[0].legend(['train', 'test'])
